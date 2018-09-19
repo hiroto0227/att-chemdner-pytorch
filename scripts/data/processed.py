@@ -71,7 +71,7 @@ def tokenize(text):
     """textをtoken単位に分割したリストを返す。"""
     tokens = re.split("""( | |\xa0|\t|\n|…|\'|\"|·|~|↔|•|\!|@|#|\$|%|\^|&|\*|
         -|=|_|\+|ˉ|\(|\)|\[|\]|\{|\}|;|‘|:|“|,|\.|\/|<|>|×|>|<|≤|≥|↑|↓|¬
-        |®|•|′|°|~|≈|\?|Δ|÷|≠|‘|’|“|”|§|£|€|0|1|2|3|4|5|6|7|8|9|™|⋅)""", text)
+        |®|•|′|°|~|≈|\?|Δ|÷|≠|‘|’|“|”|§|£|€|0|1|2|3|4|5|6|7|8|9|™|⋅|-)""", text)
     return list(filter(None, tokens))
 
 def text_to_spantokens(text):
@@ -119,9 +119,8 @@ def text_to_labels(text, spantokens):
             pass
     return labels
 
-def labels_to_spantokens(self, labels, text_spantokens):
+def labels_to_spantokens(labels, text_spantokens):
     spantokens = set()
-    text_spantokens = text_to_spantokens(text)
     entity = ''
     ann_start = 0
     pre_label = ''
