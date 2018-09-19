@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Parameter
-from torchcrf import CRF
 from torch.autograd import Variable as Var
 import time
 
@@ -68,5 +67,6 @@ class Attention(nn.Module):
         A = torch.zeros(seq_len, x.size(1), seq_len, 1)
         for t in range(seq_len):
             for j in range(seq_len):
-                A[t, :, j, :] = F.softmax(self.weight_sim(F.pairwise_distance(x[t], x[j])), 0).unsqueeze(1)
+                score = F.pairwise_distance(x[t], x[j])
+                A[t, :, j, :] = F.softmax(self.weight_sim(score), 0).unsqueeze(1)
         return A

@@ -17,9 +17,12 @@ from model.attention_lstm import Att_LSTM
 from evaluate import evaluate
 
 
-def checkpoint(epoch, model, model_path):
+def checkpoint(epoch, model, model_path, interrupted=False):
     print('model saved!!')
-    torch.save(model.state_dict(), MODEL_PATH + '_{}ep_{}bs.pth'.format(epoch, opt.batch_size))
+    if interrupted:
+        torch.save(model.state_dict(), MODEL_PATH + '_{}ep_{}bs_interrupted.pth'.format(epoch, opt.batch_size))
+    else:
+        torch.save(model.state_dict(), MODEL_PATH + '_{}ep_{}bs.pth'.format(epoch, opt.batch_size))
     return True
 
 
@@ -58,7 +61,7 @@ if __name__ == '__main__':
                 print('loss: {}'.format(loss))
                 loss_per_epoch += float(loss)
             except:
-                checkpoint(epoch, model, MODEL_PATH)
+                checkpoint(epoch, model, MODEL_PATH, interrupted=True)
                 traceback.print_exc()
                 sys.exit(1)
             #if batch_i % 10 == 0:

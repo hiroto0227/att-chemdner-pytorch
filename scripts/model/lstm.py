@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchcrf import CRF
 from torch.autograd import Variable as Var
+from torchcrf import CRF
 
 
 class LSTMTagger(nn.Module):
