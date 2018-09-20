@@ -19,10 +19,10 @@ def evaluate(dataset, model, batch_size, text_field, label_field, id2label, verb
         tokens = [b.text for b in batch]
         texts = text_field.process([b.text for b in batch], device=-1, train=False)
         labels = label_field.process([b.label for b in batch], device=-1, train=False)
-        true_labels = [[id2label[label_id] for label_id in batch] for batch in labels.transpose(1, 0)]
+        true_labels = [[id2label[label_id] for label_id in batch] for batch in labels]
         output = model(texts)
         _, label_ids = output.max(2) # (seq_length, batch_size)
-        pred_labels = [[id2label[label_id] for label_id in batch] for batch in label_ids.transpose(1, 0)]
+        pred_labels = [[id2label[label_id] for label_id in batch] for batch in label_ids]
         all_true_labels.extend([t for true_label in true_labels for t in true_label])
         all_pred_labels.extend([p for pred_label in pred_labels for p in pred_label])
 

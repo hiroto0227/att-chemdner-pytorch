@@ -12,8 +12,8 @@ class ChemdnerDataset(torchtext.data.Dataset):
 
     def __init__(self, path, fields=None, **kwargs):
         if not fields:
-            self.text_field = Field(sequential=True, tensor_type=torch.LongTensor)
-            self.label_field = Field(sequential=True)
+            self.text_field = Field(sequential=True, tensor_type=torch.LongTensor, batch_first=True)
+            self.label_field = Field(sequential=True, batch_first=True)
             fields = [('text', self.text_field), ('label', self.label_field)]
 
         examples = []
