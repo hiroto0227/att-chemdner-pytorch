@@ -75,6 +75,6 @@ if __name__ == '__main__':
         print('{}epoch\nloss: {}\nvalid: {}\ntime: {} sec.\n'.format(epoch + 1, loss_per_epoch, f1_score, time.time() - start))
         df_epoch_results = df_epoch_results.append(pd.Series({'epoch': str(epoch + 1), 'loss': str(loss_per_epoch), 'valid_precision': precision, 'valid_recall': str(recall), 'valid_fscore': str(f1_score), 'time': str(time.time() - start)}), ignore_index=True)
         checkpoint(epoch, model, MODEL_PATH)
-
+    # save result as csv file
     df_epoch_results.to_csv(os.path.join(RESULT_PATH, 'result_epoch_{}.csv'.format(MODEL_PATH.split('/')[-1])), index='epoch')
     df_iteration_results.to_csv(os.path.join(RESULT_PATH, 'result_iter_{}.csv'.format(MODEL_PATH.split('/')[-1])), index='iteration')
