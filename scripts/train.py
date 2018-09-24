@@ -64,13 +64,9 @@ if __name__ == '__main__':
                 checkpoint(epoch, model, MODEL_PATH, interrupted=True)
                 traceback.print_exc()
                 sys.exit(1)
-            #if batch_i % 10 == 0:
-            #    print('--- evaluate ---')
-            #    valid_f1_score = evaluate(dataset=valid_dataset, model=model, batch_size=opt.batch_size, text_field=train_dataset.text_field,
-            #                      label_field=train_dataset.label_field, id2label=id2label, verbose=0)
-            #    print('valid: {}'.format(valid_f1_score))
         valid_f1_score = evaluate(dataset=valid_dataset, model=model, batch_size=opt.batch_size, text_field=train_dataset.text_field,
                                   label_field=train_dataset.label_field, id2label=id2label, verbose=0)
         print('{}epoch\nloss: {}\nvalid: {}\ntime: {} sec.\n'.format(epoch, loss_per_epoch, valid_f1_score, time.time() - start))
         checkpoint(epoch, model, MODEL_PATH)
-
+    df_epoch_results.to_csv(os.path.join(RESULT_PATH, 'result_epoch_{}.csv'.format(MODEL_PATH.split('/')[-1])), index='epoch')
+    df_iteration_results.to_csv(os.path.join(RESULT_PATH, 'result_iter_{}.csv'.format(MODEL_PATH.split('/')[-1])), index='iteration')
