@@ -4,7 +4,7 @@ import torchtext
 from torchtext.data import Iterator
 from dataset import ChemdnerDataset
 from model.lstm import LSTMTagger
-from seqeval.metrics import f1_score, precision_score, recall_score
+from seqeval.metrics import f1_score
 from seqeval.metrics.sequence_labeling import get_entities
 from tqdm import tqdm
 
@@ -35,10 +35,7 @@ def evaluate(dataset, model, batch_size, text_field, label_field, id2label, verb
                 for ne_type, start_idx, end_idx in get_entities(true_label):
                     if not ne_type == '<pad>':
                         print(''.join(tokens[i][start_idx:end_idx + 1]))
-    p = precision_score(all_true_labels, all_pred_labels)
-    r = recall_score(all_true_labels, all_pred_labels)
-    f1 = f1_score(all_true_labels, all_pred_labels)
-    return p, r, f1
+    return f1_score(all_true_labels, all_pred_labels)
 
 if __name__ == '__main__':
     BATCH_SIZE = 50
