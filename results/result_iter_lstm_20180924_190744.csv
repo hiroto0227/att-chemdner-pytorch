@@ -1,0 +1,4 @@
+,iteration,loss,time
+0,1ep_0iter,tensor(1.9872),28.318840742111206
+1,2ep_0iter,tensor(1.3638),27.692903995513916
+2,3ep_0iter,tensor(0.9413),28.71267795562744
