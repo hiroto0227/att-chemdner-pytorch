@@ -7,6 +7,7 @@ from model.lstm import LSTMTagger
 from seqeval.metrics import f1_score, precision_score, recall_score
 from seqeval.metrics.sequence_labeling import get_entities
 from tqdm import tqdm
+from labels import COMMA
 
 def evaluate(dataset, model, batch_size, text_field, label_field, id2label, verbose=1):
     all_true_labels = []
@@ -28,22 +29,22 @@ def evaluate(dataset, model, batch_size, text_field, label_field, id2label, verb
 
         if verbose:
             for i, true_label in enumerate(pred_labels):
-                #print('\n---------------------\n')
-                #print(tokens[i])
-                #print('\n---------------------\n')
-                #print(true_label)
+                print('\n---------------------\n')
+                print(tokens[i])
+                print('\n---------------------\n')
+                print(true_label)
                 for ne_type, start_idx, end_idx in get_entities(true_label):
                     if not ne_type == '<pad>':
-                        print(''.join(tokens[i][start_idx:end_idx + 1]))
+                        print(''.join(tokens[i][start_idx:end_idx + 1]).replace(COMMA, ','))
     p = precision_score(all_true_labels, all_pred_labels)
     r = recall_score(all_true_labels, all_pred_labels)
     f1 = f1_score(all_true_labels, all_pred_labels)
     return p, r, f1
 
 if __name__ == '__main__':
-    BATCH_SIZE = 50
+    BATCH_SIZE = 10
     CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-    MODEL_PATH = os.path.join(CURRENT_DIR, '../models/lstm_1ep_50ba')
+    MODEL_PATH = os.path.join(CURRENT_DIR, '../models/lstm_20180925_130005_49ep_10bs.pth')
     
     train_dataset = ChemdnerDataset(path=os.path.join(CURRENT_DIR, '../datas/processed/train.csv'))
     token2id, label2id = train_dataset.make_vocab()
