@@ -31,7 +31,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='deep image inpainting')
     parser.add_argument('--batch_size', type=int, default=50, help='training batch size')
     parser.add_argument('--epoch', type=int, default=1, help='training epoch')
+    parser.add_argument('--use_cpu', type=bool, default=True, help='training epoch')
     opt = parser.parse_args()
+
+    if torch.cuda.is_available() and opt.use_cpu:
+        print('============ use GPU ==============')
+        CUDA_FLAG = True
 
     CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
     MODEL_PATH = os.path.join(CURRENT_DIR, '../models/', 'bilstm_crf_{}_{}bs'.format(datetime.now().strftime("%Y%m%d%H%M"), opt.batch_size))
@@ -39,13 +44,16 @@ if __name__ == '__main__':
     train_dataset = ChemdnerDataset(path=os.path.join(CURRENT_DIR, '../datas/processed/train.csv'))
     token2id, label2id = train_dataset.make_vocab()
     id2label = [k for k, v in label2id.items()]
-    valid_dataset = ChemdnerDataset(path=os.path.join(CURRENT_DIR, '../datas/processed/valid.csv'))
-    
+    valid_dataset = ChemdnerDataset(path=os.path.join(CURRENT_DIR, '../datas/processed/test.csv'))
+
     model = LSTMCRFTagger(vocab_dim=len(token2id), tag_dim=len(label2id), batch_size=opt.batch_size)
+
+    if CUDA_FLAG:
+        model.cuda()
     optimizer = optim.SGD(model.parameters(), lr=0.1, weight_decay=1e-4)
+
     loss_sum = 0
     train_iter = BucketIterator(train_dataset, batch_size=opt.batch_size, shuffle=True, repeat=False)
-    
     df_epoch_results = pd.DataFrame(columns=['epoch', 'loss', 'valid_precision', 'valid_recall', 'valid_fscore', 'time'])
 
     for epoch in range(opt.epoch):
@@ -61,8 +69,11 @@ if __name__ == '__main__':
                 #output = model(batch.text.cpu()) # (seq_length, batch_size, tag_size)
                 # print('output: {}'.format(output.shape))
                 # loss = F.nll_loss(output.view(-1, len(label2id)), batch.label.view(-1).cpu())
-                ####### BiLSTM CRF #########
-                loss = model.loss(batch.text.cpu(), batch.label.cpu()) / batch.text.cpu().size(0)
+                ####### BiLSTM CRF ########
+                if CUDA_FLAG:
+                    loss = -1 * model(batch.text.cuda(), batch.label.cuda())
+                else:
+                    loss = -1 * model(batch.text.cpu(), batch.label.cpu())
                 print('loss: {}'.format(float(loss)))
                 loss.backward()
                 optimizer.step()
