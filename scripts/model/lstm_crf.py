@@ -21,18 +21,19 @@ class LSTMCRFTagger(nn.Module):
         return (torch.zeros(2, self.batch_size, self.hidden_dim // 2),
                 torch.zeros(2, self.batch_size, self.hidden_dim // 2))
 
-    def forward(self, x, y):
+    def loss(self, x, y):
+        mask = torch.autograd.Variable(x.data.gt(0))
         self.hidden = self.init_hidden()
         embeds = self.embed(x)
-        print('\nembed_size: {}'.format(embeds.size()))
+        #print('\nembed_size: {}'.format(embeds.size()))
         lstm_out, self.hidden = self.lstm(embeds, self.hidden)
-        print('lstm_out_size: {}'.format(lstm_out.size()))
+        #print('lstm_out_size: {}'.format(lstm_out.size()))
         lstm_feats = self.hidden2tag(lstm_out)
-        print('lstm_feats: {}'.format(lstm_feats.size()))
-        log_likelihood = self.crf(lstm_feats, y)
-        return log_likelihood
+        #print('lstm_feats: {}'.format(lstm_feats.size()))
+        log_likelihood = self.crf(lstm_feats, y, mask=mask)
+        return - log_likelihood
 
-    def decode(self, x):
+    def forward(self, x):
         self.hidden = self.init_hidden()
         embeds = self.embed(x)
         print('\nembed_size: {}'.format(embeds.size()))
