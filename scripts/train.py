@@ -15,6 +15,7 @@ from dataset import ChemdnerDataset
 from model.lstm_crf import LSTMCRFTagger
 from model.attention_lstm import Att_LSTM
 from evaluate import evaluate
+import pandas as pd
 
 
 def checkpoint(epoch, model, model_path, interrupted=False):
@@ -33,23 +34,26 @@ if __name__ == '__main__':
     opt = parser.parse_args()
 
     CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-    MODEL_PATH = os.path.join(CURRENT_DIR, '../models/', 'lstm_{}'.format(datetime.now().strftime("%Y%m%d_%H%M%S")))
-
+    MODEL_PATH = os.path.join(CURRENT_DIR, '../models/', 'lstm_{}_{}bs'.format(datetime.now().strftime("%Y%m%d%H%M"), opt.batch_size))
+    RESULT_PATH = os.path.join(CURRENT_DIR, '../results/')
     train_dataset = ChemdnerDataset(path=os.path.join(CURRENT_DIR, '../datas/processed/train.csv'))
     token2id, label2id = train_dataset.make_vocab()
     id2label = [k for k, v in label2id.items()]
-    valid_dataset = ChemdnerDataset(path=os.path.join(CURRENT_DIR, '../datas/processed/test.csv'))
+    valid_dataset = ChemdnerDataset(path=os.path.join(CURRENT_DIR, '../datas/processed/valid.csv'))
     
     model = LSTMCRFTagger(vocab_dim=len(token2id), tag_dim=len(label2id), batch_size=opt.batch_size)
     optimizer = optim.SGD(model.parameters(), lr=0.1)
     loss_sum = 0
     train_iter = BucketIterator(train_dataset, batch_size=opt.batch_size, shuffle=True, repeat=False)
     
+    df_epoch_results = pd.DataFrame(columns=['epoch', 'loss', 'valid_precision', 'valid_recall', 'valid_fscore', 'time'])
+
     for epoch in range(opt.epoch):
         start = time.time()
         loss_per_epoch = 0
         for batch_i, batch in tqdm(enumerate(train_iter)):
             try:
+                batch_start = time.time()
                 model.zero_grad()
                 model.train()
                 ###### LSTM ##########
@@ -61,15 +65,13 @@ if __name__ == '__main__':
                 loss = -1 * model(batch.text.cpu(), batch.label.cpu())
                 loss.backward()
                 optimizer.step()
-                print('loss: {}'.format(loss))
                 loss_per_epoch += float(loss)
             except:
                 checkpoint(epoch, model, MODEL_PATH, interrupted=True)
                 traceback.print_exc()
                 sys.exit(1)
-        valid_f1_score = evaluate(dataset=valid_dataset, model=model, batch_size=opt.batch_size, text_field=train_dataset.text_field,
-                                  label_field=train_dataset.label_field, id2label=id2label, verbose=0)
-        print('{}epoch\nloss: {}\nvalid: {}\ntime: {} sec.\n'.format(epoch, loss_per_epoch, valid_f1_score, time.time() - start))
-        checkpoint(epoch, model, MODEL_PATH)
-    df_epoch_results.to_csv(os.path.join(RESULT_PATH, 'result_epoch_{}.csv'.format(MODEL_PATH.split('/')[-1])), index='epoch')
-    df_iteration_results.to_csv(os.path.join(RESULT_PATH, 'result_iter_{}.csv'.format(MODEL_PATH.split('/')[-1])), index='iteration')
+        precision, recall, f1_score = evaluate(dataset=valid_dataset, model=model, batch_size=opt.batch_size, text_field=train_dataset.text_field, label_field=train_dataset.label_field, id2label=id2label, verbose=0)
+        print('{}epoch\nloss: {}\nvalid: {}\ntime: {} sec.\n'.format(epoch + 1, loss_per_epoch, f1_score, time.time() - start))
+        df_epoch_results = df_epoch_results.append(pd.Series({'epoch': epoch + 1, 'loss': loss_per_epoch, 'valid_precision': precision, 'valid_recall': recall, 'valid_fscore': f1_score, 'time': time.time() - start}), ignore_index=True)
+    checkpoint(epoch, model, MODEL_PATH)
+    df_epoch_results.to_csv(os.path.join(RESULT_PATH, 'result_epoch_{}.csv'.format(MODEL_PATH.split('/')[-1])), float_format='%.3f')
