@@ -12,7 +12,7 @@ from torch import optim
 import torch.nn as nn
 import torch.nn.functional as F
 from dataset import ChemdnerDataset
-from model.lstm import LSTMTagger
+from model.lstm_crf import LSTMCRFTagger
 from model.attention_lstm import Att_LSTM
 from evaluate import evaluate
 
@@ -40,7 +40,7 @@ if __name__ == '__main__':
     id2label = [k for k, v in label2id.items()]
     valid_dataset = ChemdnerDataset(path=os.path.join(CURRENT_DIR, '../datas/processed/test.csv'))
     
-    model = LSTMTagger(vocab_dim=len(token2id), tag_dim=len(label2id), batch_size=opt.batch_size)
+    model = LSTMCRFTagger(vocab_dim=len(token2id), tag_dim=len(label2id), batch_size=opt.batch_size)
     optimizer = optim.SGD(model.parameters(), lr=0.1)
     loss_sum = 0
     train_iter = BucketIterator(train_dataset, batch_size=opt.batch_size, shuffle=True, repeat=False)
@@ -52,10 +52,13 @@ if __name__ == '__main__':
             try:
                 model.zero_grad()
                 model.train()
+                ###### LSTM ##########
                 # print('\ninput: {}'.format(batch.text.shape)) # (seq_length, batch_size)
-                output = model(batch.text.cpu()) # (seq_length, batch_size, tag_size)
+                #output = model(batch.text.cpu()) # (seq_length, batch_size, tag_size)
                 # print('output: {}'.format(output.shape))
-                loss = F.nll_loss(output.view(-1, len(label2id)), batch.label.view(-1).cpu())
+                # loss = F.nll_loss(output.view(-1, len(label2id)), batch.label.view(-1).cpu())
+                ####### BiLSTM CRF #########
+                loss = model(batch.text.cpu(), batch.label.cpu())
                 loss.backward()
                 optimizer.step()
                 print('loss: {}'.format(loss))
