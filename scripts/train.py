@@ -58,7 +58,7 @@ if __name__ == '__main__':
                 # print('output: {}'.format(output.shape))
                 # loss = F.nll_loss(output.view(-1, len(label2id)), batch.label.view(-1).cpu())
                 ####### BiLSTM CRF #########
-                loss = model(batch.text.cpu(), batch.label.cpu())
+                loss = -1 * model(batch.text.cpu(), batch.label.cpu())
                 loss.backward()
                 optimizer.step()
                 print('loss: {}'.format(loss))

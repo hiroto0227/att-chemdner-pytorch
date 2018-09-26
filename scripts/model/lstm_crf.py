@@ -32,3 +32,13 @@ class LSTMCRFTagger(nn.Module):
         log_likelihood = self.crf(lstm_feats, y)
         return log_likelihood
 
+    def decode(self, x):
+        self.hidden = self.init_hidden()
+        embeds = self.embed(x)
+        print('\nembed_size: {}'.format(embeds.size()))
+        lstm_out, self.hidden = self.lstm(embeds, self.hidden)
+        print('lstm_out_size: {}'.format(lstm_out.size()))
+        lstm_feats = self.hidden2tag(lstm_out)
+        print('lstm_feats: {}'.format(lstm_feats.size()))
+        decoded = self.crf.decode(lstm_feats)
+        print('decoded: {}'.format(decoded.shape))
