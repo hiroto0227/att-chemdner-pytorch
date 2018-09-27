@@ -35,7 +35,8 @@ class LSTMCRFTagger(nn.Module):
         lstm_feats = self.hidden2tag(lstm_out)
         #print('lstm_feats: {}'.format(lstm_feats.size()))
         log_likelihood = self.crf(lstm_feats, y, mask=mask)
-        return - log_likelihood
+        # log_likelihoodを最大にすれば良いが、最小化するので-1をかけている。
+        return -1 * log_likelihood
 
     def forward(self, x):
         self.hidden = self.init_hidden()

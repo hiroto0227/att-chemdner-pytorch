@@ -41,7 +41,7 @@ if __name__ == '__main__':
     if opt.gpu and torch.cuda.is_available():
         print('\n=============== use GPU =================\n')
         model.cuda()
-    optimizer = optim.SGD(model.parameters(), lr=0.1, weight_decay=1e-4)
+    optimizer = optim.SGD(model.parameters(), lr=0.1, weight_decay=0)
 
     loss_sum = 0
     train_iter = BucketIterator(train_dataset, batch_size=opt.batch_size, shuffle=True, repeat=False, device=-1)
@@ -64,7 +64,7 @@ if __name__ == '__main__':
                 ###### LStm ##########
 
                 ####### BiLSTM CRF ########
-                loss = -1 * model.loss(input_tensor, target_tensor)
+                loss = model.loss(input_tensor, target_tensor) / input_tensor.size(0)
                 ####### BiLSTM CRF ########
 
                 print('loss: {}'.format(float(loss)))
@@ -78,9 +78,10 @@ if __name__ == '__main__':
                 traceback.print_exc()
                 sys.exit(1)
 
-        precision, recall, f1_score = evaluate(dataset=valid_dataset, model=model, batch_size=opt.batch_size, text_field=train_dataset.text_field, label_field=train_dataset.label_field, id2label=id2label, verbose=0, use_gpu=opt.gpu)
-        df_epoch_results = df_epoch_results.append(pd.Series({'epoch': epoch + 1, 'loss': loss_per_epoch, 'valid_precision': precision, 'valid_recall': recall, 'valid_fscore': f1_score, 'time': time.time() - start}), ignore_index=True)
-        print('{}epoch\nloss: {}\nvalid: {}\ntime: {} sec.\n'.format(epoch + 1, loss_per_epoch, f1_score, time.time() - start))
+        if epoch%5 == 0:
+            precision, recall, f1_score = evaluate(dataset=valid_dataset, model=model, batch_size=opt.batch_size, text_field=train_dataset.text_field, label_field=train_dataset.label_field, id2label=id2label, verbose=0, use_gpu=opt.gpu)
+            df_epoch_results = df_epoch_results.append(pd.Series({'epoch': epoch + 1, 'loss': loss_per_epoch, 'valid_precision': precision, 'valid_recall': recall, 'valid_fscore': f1_score, 'time': time.time() - start}), ignore_index=True)
+            print('{}epoch\nloss: {}\nvalid: {}\ntime: {} sec.\n'.format(epoch + 1, loss_per_epoch, f1_score, time.time() - start))
     
     checkpoint(epoch, model, MODEL_PATH, batch_size=opt.batch_size, use_gpu=opt.gpu)
     df_epoch_results.to_csv(os.path.join(RESULT_PATH, 'result_epoch_{}.csv'.format(MODEL_PATH.split('/')[-1])), float_format='%.3f')
