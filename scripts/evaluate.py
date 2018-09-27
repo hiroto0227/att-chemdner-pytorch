@@ -10,8 +10,10 @@ from seqeval.metrics.sequence_labeling import get_entities
 from tqdm import tqdm
 from labels import COMMA
 import argparse
+from utils import get_variable
 
-def evaluate(dataset, model, batch_size, text_field, label_field, id2label, verbose=1):
+
+def evaluate(dataset, model, batch_size, text_field, label_field, id2label, verbose=1, use_gpu=True):
     all_true_labels = []
     all_pred_labels = []
     model.eval()
@@ -29,7 +31,7 @@ def evaluate(dataset, model, batch_size, text_field, label_field, id2label, verb
         #pred_labels = [[id2label[label_id] for label_id in batch] for batch in label_ids.transpose(1, 0)]
         
         ###### LSTM CRF ########
-        label_ids = model(texts)
+        label_ids = model(get_variable(texts, use_gpu=use_gpu))
         pred_labels = [[id2label[int(label_id)] for label_id in batch] for batch in label_ids]
         all_true_labels.extend([t for true_label in true_labels for t in true_label])
         all_pred_labels.extend([p for pred_label in pred_labels for p in pred_label])
@@ -45,7 +47,7 @@ def evaluate(dataset, model, batch_size, text_field, label_field, id2label, verb
                         print(''.join(tokens[i][start_idx:end_idx + 1]).replace(COMMA, ','))
     p = precision_score(all_true_labels, all_pred_labels)
     r = recall_score(all_true_labels, all_pred_labels)
-    f1 = 2 * r * p / (r + p)
+    f1 = 2 * r * p / (r + p) if r + p > 0 else 0
     return p, r, f1
 
 if __name__ == '__main__':
