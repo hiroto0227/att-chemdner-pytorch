@@ -70,6 +70,7 @@ if __name__ == '__main__':
             except:
                 checkpoint(epoch, model, MODEL_PATH, interrupted=True)
                 traceback.print_exc()
+                df_epoch_results.to_csv(os.path.join(RESULT_PATH, 'result_epoch_{}.csv'.format(MODEL_PATH.split('/')[-1])), float_format='%.3f')
                 sys.exit(1)
         precision, recall, f1_score = evaluate(dataset=valid_dataset, model=model, batch_size=opt.batch_size, text_field=train_dataset.text_field, label_field=train_dataset.label_field, id2label=id2label, verbose=0)
         print('{}epoch\nloss: {}\nvalid: {}\ntime: {} sec.\n'.format(epoch + 1, loss_per_epoch, f1_score, time.time() - start))
