@@ -4,10 +4,12 @@ import torchtext
 from torchtext.data import Iterator
 from dataset import ChemdnerDataset
 from model.lstm import LSTMTagger
+from model.lstm_crf import LSTMCRFTagger
 from seqeval.metrics import f1_score, precision_score, recall_score
 from seqeval.metrics.sequence_labeling import get_entities
 from tqdm import tqdm
 from labels import COMMA
+import argparse
 
 def evaluate(dataset, model, batch_size, text_field, label_field, id2label, verbose=1):
     all_true_labels = []
@@ -21,9 +23,14 @@ def evaluate(dataset, model, batch_size, text_field, label_field, id2label, verb
         texts = text_field.process([b.text for b in batch], device=-1, train=False)
         labels = label_field.process([b.label for b in batch], device=-1, train=False)
         true_labels = [[id2label[label_id] for label_id in batch] for batch in labels.transpose(1, 0)]
-        output = model(texts)
-        _, label_ids = output.max(2) # (seq_length, batch_size)
-        pred_labels = [[id2label[label_id] for label_id in batch] for batch in label_ids.transpose(1, 0)]
+        ##### LSTM #########
+        #output = model(texts)
+        #_, label_ids = output.max(2) # (seq_length, batch_size)
+        #pred_labels = [[id2label[label_id] for label_id in batch] for batch in label_ids.transpose(1, 0)]
+        
+        ###### LSTM CRF ########
+        label_ids = model(texts)
+        pred_labels = [[id2label[int(label_id)] for label_id in batch] for batch in label_ids]
         all_true_labels.extend([t for true_label in true_labels for t in true_label])
         all_pred_labels.extend([p for pred_label in pred_labels for p in pred_label])
 
@@ -42,9 +49,12 @@ def evaluate(dataset, model, batch_size, text_field, label_field, id2label, verb
     return p, r, f1
 
 if __name__ == '__main__':
-    BATCH_SIZE = 10
+    parser = argparse.ArgumentParser(description='deep image inpainting')
+    parser.add_argument('--batch_size', type=int, default=10, help='trained batch size')
+    parser.add_argument('--model_path', type=str, default=None, help='trained model path')
+    opt = parser.parse_args()
+    
     CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-    MODEL_PATH = os.path.join(CURRENT_DIR, '../models/lstm_20180925_130005_49ep_10bs.pth')
     
     train_dataset = ChemdnerDataset(path=os.path.join(CURRENT_DIR, '../datas/processed/train.csv'))
     token2id, label2id = train_dataset.make_vocab()
@@ -52,9 +62,9 @@ if __name__ == '__main__':
     fields = [('text', train_dataset.text_field), ('label', train_dataset.label_field)]
     test_dataset = ChemdnerDataset(path=os.path.join(CURRENT_DIR, '../datas/processed/test.csv'), fields=fields)
     
-    model = LSTMTagger(len(token2id), len(label2id), batch_size=BATCH_SIZE)
-    model.load_state_dict(torch.load(MODEL_PATH))
+    model = LSTMCRFTagger(len(token2id), len(label2id), batch_size=BATCH_SIZE)
+    model.load_state_dict(torch.load(opt.model_path))
 
-    f1score = evaluate(dataset=test_dataset, model=model, batch_size=BATCH_SIZE, text_field=train_dataset.text_field,
-                       label_field=train_dataset.label_field, id2label=id2label, verbose=1)
-    
+    p, r, f1 = evaluate(dataset=test_dataset, model=model, batch_size=BATCH_SIZE, text_field=train_dataset.text_field,
+                       label_field=train_dataset.label_field, id2label=id2label, verbose=0)
+    print('\nprecision: {}\nrecall: {}\nf1score: {}'.format(p, r, f1))
