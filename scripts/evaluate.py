@@ -45,7 +45,7 @@ def evaluate(dataset, model, batch_size, text_field, label_field, id2label, verb
                         print(''.join(tokens[i][start_idx:end_idx + 1]).replace(COMMA, ','))
     p = precision_score(all_true_labels, all_pred_labels)
     r = recall_score(all_true_labels, all_pred_labels)
-    f1 = f1_score(all_true_labels, all_pred_labels)
+    f1 = 2 * r * p / (r + p)
     return p, r, f1
 
 if __name__ == '__main__':
@@ -62,9 +62,9 @@ if __name__ == '__main__':
     fields = [('text', train_dataset.text_field), ('label', train_dataset.label_field)]
     test_dataset = ChemdnerDataset(path=os.path.join(CURRENT_DIR, '../datas/processed/test.csv'), fields=fields)
     
-    model = LSTMCRFTagger(len(token2id), len(label2id), batch_size=BATCH_SIZE)
+    model = LSTMCRFTagger(len(token2id), len(label2id), batch_size=opt.batch_size)
     model.load_state_dict(torch.load(opt.model_path))
 
-    p, r, f1 = evaluate(dataset=test_dataset, model=model, batch_size=BATCH_SIZE, text_field=train_dataset.text_field,
+    p, r, f1 = evaluate(dataset=test_dataset, model=model, batch_size=opt.batch_size, text_field=train_dataset.text_field,
                        label_field=train_dataset.label_field, id2label=id2label, verbose=0)
     print('\nprecision: {}\nrecall: {}\nf1score: {}'.format(p, r, f1))
