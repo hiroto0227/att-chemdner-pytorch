@@ -13,14 +13,14 @@ import argparse
 from utils import get_variable
 
 
-def evaluate(dataset, model, batch_size, text_field, label_field, id2label, verbose=1, use_gpu=True):
+def evaluate(dataset, model, batch_size, text_field, label_field, id2label, verbose=1, use_gpu=True, use_eval_batch_len=-1):
     all_true_labels = []
     all_pred_labels = []
     model.eval()
     eval_iter = Iterator(dataset, batch_size=batch_size, shuffle=False, repeat=False)
     eval_iter.create_batches()
 
-    for batch in tqdm(eval_iter.batches):
+    for batch_i, batch in tqdm(enumerate(eval_iter.batches)):
         tokens = [b.text for b in batch]
         texts = text_field.process([b.text for b in batch], device=-1, train=False)
         labels = label_field.process([b.label for b in batch], device=-1, train=False)
@@ -45,6 +45,8 @@ def evaluate(dataset, model, batch_size, text_field, label_field, id2label, verb
                 for ne_type, start_idx, end_idx in get_entities(true_label):
                     if not ne_type == '<pad>':
                         print(''.join(tokens[i][start_idx:end_idx + 1]).replace(COMMA, ','))
+        if use_eval_batch_len == batch_i:
+            break
     p = precision_score(all_true_labels, all_pred_labels)
     r = recall_score(all_true_labels, all_pred_labels)
     f1 = 2 * r * p / (r + p) if r + p > 0 else 0
@@ -54,6 +56,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='deep image inpainting')
     parser.add_argument('--batch_size', type=int, default=10, help='trained batch size')
     parser.add_argument('--model_path', type=str, default=None, help='trained model path')
+    parser.add_argument('--gpu', action='store_true')
     opt = parser.parse_args()
     
     CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -64,9 +67,12 @@ if __name__ == '__main__':
     fields = [('text', train_dataset.text_field), ('label', train_dataset.label_field)]
     test_dataset = ChemdnerDataset(path=os.path.join(CURRENT_DIR, '../datas/processed/test.csv'), fields=fields)
     
-    model = LSTMCRFTagger(len(token2id), len(label2id), batch_size=opt.batch_size)
+    model = LSTMCRFTagger(len(token2id), len(label2id), batch_size=opt.batch_size, use_gpu=True)
     model.load_state_dict(torch.load(opt.model_path))
+    if opt.gpu and torch.cuda.is_available():
+        model.cuda()
+        print('=========== use gpu ==============')
 
     p, r, f1 = evaluate(dataset=test_dataset, model=model, batch_size=opt.batch_size, text_field=train_dataset.text_field,
-                       label_field=train_dataset.label_field, id2label=id2label, verbose=0)
+                       label_field=train_dataset.label_field, id2label=id2label, verbose=0, use_gpu=opt.gpu)
     print('\nprecision: {}\nrecall: {}\nf1score: {}'.format(p, r, f1))

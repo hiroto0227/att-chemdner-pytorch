@@ -17,13 +17,17 @@ from model.lstm_crf import LSTMCRFTagger
 from model.attention_lstm import Att_LSTM
 from evaluate import evaluate
 import pandas as pd
-from utils import get_variable, checkpoint
+from utils import get_variable, checkpoint, EarlyStop
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='deep image inpainting')
     parser.add_argument('--batch_size', type=int, default=50, help='training batch size')
     parser.add_argument('--epoch', type=int, default=1, help='training epoch')
+    parser.add_argument('--embed_dim', type=int, default=300, help='embedding dim')
+    parser.add_argument('--hidden_dim', type=int, default=1000, help='hidden dim')
+    parser.add_argument('--num_layers', type=int, default=1, help='num layers')
+    parser.add_argument('--early_stop', action='store_true')
     parser.add_argument('--gpu', action='store_true')
     opt = parser.parse_args()
     
@@ -37,22 +41,24 @@ if __name__ == '__main__':
     id2label = [k for k, v in label2id.items()]
     valid_dataset = ChemdnerDataset(path=os.path.join(CURRENT_DIR, '../datas/processed/test.csv'))
 
-    model = LSTMCRFTagger(vocab_dim=len(token2id), tag_dim=len(label2id), batch_size=opt.batch_size, use_gpu=opt.gpu)
+    ########## initialize ##############
+    model = LSTMCRFTagger(vocab_dim=len(token2id), tag_dim=len(label2id), batch_size=opt.batch_size, embed_dim=opt.embed_dim, hidden_dim=opt.hidden_dim, use_gpu=opt.gpu, num_layers=opt.num_layers)
     if opt.gpu and torch.cuda.is_available():
         print('\n=============== use GPU =================\n')
         model.cuda()
     optimizer = optim.SGD(model.parameters(), lr=0.1, weight_decay=0)
 
-    loss_sum = 0
     train_iter = BucketIterator(train_dataset, batch_size=opt.batch_size, shuffle=True, repeat=False, device=-1)
     df_epoch_results = pd.DataFrame(columns=['epoch', 'loss', 'valid_precision', 'valid_recall', 'valid_fscore', 'time'])
+    early_stopping = EarlyStop(stop_not_rise_num=7, threshold_rate=0.01)
+    precision, recall, f1_score = (0, 0, 0)
 
-    for epoch in range(opt.epoch):
+    ############ start training ################
+    for epoch in range(1, opt.epoch + 1):
         start = time.time()
         loss_per_epoch = 0
         for batch_i, batch in tqdm(enumerate(train_iter)):
             try:
-                batch_start = time.time()
                 input_tensor = get_variable(batch.text, use_gpu=opt.gpu)
                 target_tensor = get_variable(batch.label, use_gpu=opt.gpu)
                 model.zero_grad()
@@ -67,7 +73,7 @@ if __name__ == '__main__':
                 loss = model.loss(input_tensor, target_tensor) / input_tensor.size(0)
                 ####### BiLSTM CRF ########
 
-                print('loss: {}'.format(float(loss)))
+                #print(' : {}ep, {}iter, loss: {}'.format(epoch, batch_i, float(loss)))
                 loss.backward()
                 optimizer.step()
                 loss_per_epoch += float(loss)
@@ -78,10 +84,26 @@ if __name__ == '__main__':
                 traceback.print_exc()
                 sys.exit(1)
 
-        if epoch%5 == 0:
-            precision, recall, f1_score = evaluate(dataset=valid_dataset, model=model, batch_size=opt.batch_size, text_field=train_dataset.text_field, label_field=train_dataset.label_field, id2label=id2label, verbose=0, use_gpu=opt.gpu)
-            df_epoch_results = df_epoch_results.append(pd.Series({'epoch': epoch + 1, 'loss': loss_per_epoch, 'valid_precision': precision, 'valid_recall': recall, 'valid_fscore': f1_score, 'time': time.time() - start}), ignore_index=True)
-            print('{}epoch\nloss: {}\nvalid: {}\ntime: {} sec.\n'.format(epoch + 1, loss_per_epoch, f1_score, time.time() - start))
+        if epoch % 5 == 0:
+            precision, recall, f1_score = evaluate(dataset=valid_dataset, 
+                                                   model=model,
+                                                   batch_size=opt.batch_size,
+                                                   text_field=train_dataset.text_field,
+                                                   label_field=train_dataset.label_field,
+                                                   id2label=id2label,
+                                                   verbose=0,
+                                                   use_gpu=opt.gpu)
+            if early_stopping.is_end(f1_score):
+                break
+
+        df_epoch_results = df_epoch_results.append(pd.Series({'epoch': epoch,
+                           'loss': loss_per_epoch,
+                           'valid_precision': precision,
+                           'valid_recall': recall,
+                           'valid_fscore': f1_score,
+                           'time': time.time() - start}), ignore_index=True)
+
+        print('{}epoch\nloss: {}\nvalid: {}\ntime: {} sec.\n'.format(epoch, loss_per_epoch, f1_score, time.time() - start))
     
     checkpoint(epoch, model, MODEL_PATH, batch_size=opt.batch_size, use_gpu=opt.gpu)
     df_epoch_results.to_csv(os.path.join(RESULT_PATH, 'result_epoch_{}.csv'.format(MODEL_PATH.split('/')[-1])), float_format='%.3f')
