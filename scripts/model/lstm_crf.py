@@ -8,7 +8,7 @@ from model.char_cnn import CharCNN
 
 
 class LSTMCRFTagger(nn.Module):
-    def __init__(self, vocab_dim, tag_dim, embed_dim=300, hidden_dim=1000, batch_size=32, use_gpu=True, alphabet_size=50):
+    def __init__(self, vocab_dim, tag_dim, embed_dim=300, hidden_dim=1000, batch_size=32, num_layers=1, use_gpu=True, alphabet_size=50):
         super().__init__()
         self.alphabet_size = alphabet_size
         self.char_embedding_dim = 200
@@ -19,6 +19,7 @@ class LSTMCRFTagger(nn.Module):
         self.embed_dim = embed_dim
         self.hidden_dim = hidden_dim
         self.tag_dim = tag_dim
+        self.num_layers = num_layers
         self.use_gpu = use_gpu
         
         self.embed = nn.Embedding(vocab_dim, embed_dim) 
@@ -29,8 +30,8 @@ class LSTMCRFTagger(nn.Module):
         self.crf = CRF(self.tag_dim)
 
     def init_hidden(self):
-        return (get_variable(torch.zeros(2, self.batch_size, self.hidden_dim // 2), use_gpu=self.use_gpu),
-                get_variable(torch.zeros(2, self.batch_size, self.hidden_dim // 2), use_gpu=self.use_gpu))
+        return (get_variable(torch.zeros(2 * self.num_layers, self.batch_size, self.hidden_dim // 2), use_gpu=self.use_gpu),
+                get_variable(torch.zeros(2 * self.num_layers, self.batch_size, self.hidden_dim // 2), use_gpu=self.use_gpu))
 
     def loss(self, x, char_x, y):
         mask = get_variable(torch.autograd.Variable(x.data.gt(0)), use_gpu=self.use_gpu)

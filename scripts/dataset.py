@@ -32,7 +32,7 @@ class ChemdnerDataset(torchtext.data.Dataset):
     def make_vocab(self):
         self.text_field.build_vocab(self)
         self.label_field.build_vocab(self)
-        # self.text_field.vocab.load_vectors("fasttext.simple.300d")
+        self.text_field.vocab.load_vectors("fasttext.simple.300d")
         return self.text_field.vocab.stoi, self.label_field.vocab.stoi
 
     def get_id2token(self, tokenize=list):
