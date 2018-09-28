@@ -1,6 +1,7 @@
 import torch
 import torchtext
 from torchtext.data import Field
+from labels import PAD, UNK, COMMA
 
 
 class ChemdnerDataset(torchtext.data.Dataset):
@@ -20,8 +21,8 @@ class ChemdnerDataset(torchtext.data.Dataset):
         with open(path) as f:
             rows = f.read().split('\n')
             for i, row in enumerate(rows):
-                #if i == 10:
-                #    break
+                if i == 10:
+                    break
                 splitted_row = row.split(',')
                 length = len(splitted_row) // 2
                 tokens, labels = splitted_row[:length], splitted_row[length:]
@@ -31,5 +32,13 @@ class ChemdnerDataset(torchtext.data.Dataset):
     def make_vocab(self):
         self.text_field.build_vocab(self)
         self.label_field.build_vocab(self)
-        self.text_field.vocab_.load_vectors("fasttext.simple.300d")
+        # self.text_field.vocab.load_vectors("fasttext.simple.300d")
         return self.text_field.vocab.stoi, self.label_field.vocab.stoi
+
+    def get_id2token(self, tokenize=list):
+        id2token = [PAD, UNK, COMMA, '<pad>']
+        for example in self.examples:
+            for token in list(''.join(example.text)):
+                if not token in id2token:
+                    id2token.append(token)
+        return id2token
