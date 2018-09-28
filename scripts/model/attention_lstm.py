@@ -15,7 +15,7 @@ class Att_LSTM(nn.Module):
         self.tag_dim = tag_dim
 
         self.embed = nn.Embedding(vocab_dim, embed_dim)
-        self.lstm = nn.LSTM(embed_dim, hidden_dim)
+        self.lstm = nn.LSTM(embed_dim, hidden_dim, batch_first=True)
         self.attention = Attention(batch_size, hidden_dim, att_hidden_dim)
         self.hidden = self.init_hidden()
         self.att2tag = nn.Linear(att_hidden_dim, tag_dim)
