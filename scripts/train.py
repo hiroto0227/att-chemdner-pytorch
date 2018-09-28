@@ -18,7 +18,7 @@ from model.lstm_crf import LSTMCRFTagger
 from model.attention_lstm import Att_LSTM
 from evaluate import evaluate
 import pandas as pd
-from utils import get_variable, checkpoint, make_subwords_from_token_batches
+from utils import EarlyStop, get_variable, checkpoint, make_subwords_from_token_batches
 
 
 if __name__ == '__main__':
@@ -41,7 +41,7 @@ if __name__ == '__main__':
     token2id, label2id = train_dataset.make_vocab()
     id2token, id2label = [k for k, v in token2id.items()], [k for k, v in label2id.items()]
     id2char = train_dataset.get_id2token(tokenize=str.split)
-    valid_dataset = ChemdnerDataset(path=os.path.join(CURRENT_DIR, '../datas/processed/test.csv'))
+    valid_dataset = ChemdnerDataset(path=os.path.join(CURRENT_DIR, '../datas/processed/valid.csv'))
 
     model = LSTMCRFTagger(vocab_dim=len(token2id),
                           tag_dim=len(label2id),
@@ -99,13 +99,14 @@ if __name__ == '__main__':
                 traceback.print_exc()
                 sys.exit(1)
 
-        if epoch % 5 == 0:
+        if epoch % 5 == 1:
             precision, recall, f1_score = evaluate(dataset=valid_dataset, 
                                                    model=model,
                                                    batch_size=opt.batch_size,
                                                    text_field=train_dataset.text_field,
                                                    label_field=train_dataset.label_field,
                                                    id2label=id2label,
+                                                   id2char=id2char,
                                                    verbose=0,
                                                    use_gpu=opt.gpu)
             if early_stopping.is_end(f1_score):

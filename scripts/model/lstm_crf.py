@@ -12,7 +12,7 @@ class LSTMCRFTagger(nn.Module):
         super().__init__()
         self.alphabet_size = alphabet_size
         self.char_embedding_dim = 200
-        self.char_hidden_dim =  1000
+        self.char_hidden_dim =  200
         self.char_dropout = 0.5
 
         self.batch_size = batch_size
@@ -23,7 +23,7 @@ class LSTMCRFTagger(nn.Module):
         self.use_gpu = use_gpu
         
         self.embed = nn.Embedding(vocab_dim, embed_dim) 
-        self.char_cnn = CharCNN(self.alphabet_size, self.char_embedding_dim, self.hidden_dim, dropout=self.char_dropout, gpu=use_gpu)
+        self.char_cnn = CharCNN(self.alphabet_size, self.char_embedding_dim, self.char_hidden_dim, dropout=self.char_dropout, gpu=use_gpu)
         self.lstm = nn.LSTM(embed_dim + self.char_hidden_dim, hidden_dim // 2, num_layers=1, bidirectional=True)
         self.hidden = self.init_hidden()
         self.hidden2tag = nn.Linear(hidden_dim, tag_dim)
@@ -37,11 +37,11 @@ class LSTMCRFTagger(nn.Module):
         mask = get_variable(torch.autograd.Variable(x.data.gt(0)), use_gpu=self.use_gpu)
         self.hidden = self.init_hidden()
         char_hidden = self.char_cnn(char_x)
-        print('char_hidden: {}'.format(char_hidden.shape))
+        #print('char_hidden: {}'.format(char_hidden.shape))
         embeds = self.embed(x)
-        print('embeds_hidden: {}'.format(embeds.shape))
+        #print('embeds_hidden: {}'.format(embeds.shape))
         char_word_tensor = torch.cat([embeds, char_hidden], dim=2)
-        print('char_word_tensor: {}'.format(char_word_tensor.shape))
+        #print('char_word_tensor: {}'.format(char_word_tensor.shape))
         lstm_out, self.hidden = self.lstm(char_word_tensor, self.hidden)
         #print('lstm_out_size: {}'.format(lstm_out.size()))
         lstm_feats = self.hidden2tag(lstm_out)
@@ -50,11 +50,13 @@ class LSTMCRFTagger(nn.Module):
         # log_likelihoodを最大にすれば良いが、最小化するので-1をかけている。
         return -1 * log_likelihood
 
-    def forward(self, x):
+    def forward(self, x, char_x):
         self.hidden = self.init_hidden()
+        char_hidden = self.char_cnn(char_x)
         embeds = self.embed(x)
         #print('\nembed_size: {}'.format(embeds.size()))
-        lstm_out, self.hidden = self.lstm(embeds, self.hidden)
+        char_word_tensor = torch.cat([embeds, char_hidden], dim=2)
+        lstm_out, self.hidden = self.lstm(char_word_tensor, self.hidden)
         #print('lstm_out_size: {}'.format(lstm_out.size()))
         lstm_feats = self.hidden2tag(lstm_out)
         #print('lstm_feats: {}'.format(lstm_feats.size()))
