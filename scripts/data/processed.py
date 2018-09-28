@@ -146,5 +146,6 @@ def labels_to_spantokens(labels, text_spantokens):
     return spantokens
 
 if __name__ == '__main__':
-    for mode in ['train', 'test']:
+    for mode in ['train', 'valid', 'test']:
+        print('---- make {}.csv ---'.format(mode))
         main(mode=mode)

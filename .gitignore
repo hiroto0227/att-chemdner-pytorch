@@ -4,5 +4,5 @@
 __pycache__/
 datas/raw/
 datas/processed/
-models/
+# models/
 .python-version
