@@ -33,23 +33,33 @@ def evaluate(dataset, model, batch_size, text_field, label_field, id2label, verb
         ###### LSTM CRF ########
         label_ids = model(get_variable(texts, use_gpu=use_gpu))
         pred_labels = [[id2label[int(label_id)] for label_id in batch] for batch in label_ids]
-        all_true_labels.extend([t for true_label in true_labels for t in true_label])
-        all_pred_labels.extend([p for pred_label in pred_labels for p in pred_label])
+        # all_true_labels.extend([t for true_label in true_labels for t in true_label])
+        # all_pred_labels.extend([p for pred_label in pred_labels for p in pred_label])
 
         if verbose:
-            for i, true_label in enumerate(pred_labels):
-                print('\n---------------------\n')
-                print(tokens[i])
-                print('\n---------------------\n')
-                print(true_label)
-                for ne_type, start_idx, end_idx in get_entities(true_label):
-                    if not ne_type == '<pad>':
-                        print(''.join(tokens[i][start_idx:end_idx + 1]).replace(COMMA, ','))
+            for i, (true_label, pred_label) in enumerate(zip(ture_labels, pred_labels)):
+                true_entities = get_entities(true_label)
+                len_true_entities = len(true_entities)
+                pred_entities = get_entities(pred_label)
+                len_pred_entities = len(pred_entities)
+
+                if len_true_entities == 0:
+                    pass
+                else:
+                    TP = 0
+                    for i, true_entity  in enumerate(true_entities):
+                        for j, pred_entity in enumerate(pred_entities):
+                            if true_entity == pred_entity:
+                                TP += 1
+                    precision = TP / len_pred_entities if len_pred_entities > 0 else 0
+                    recall = TP / len_true_entities
+                    fscore = 2 * precision * recall / (recall + precision) if recall + precision > 0 else 0
+
         if use_eval_batch_len == batch_i:
             break
-    p = precision_score(all_true_labels, all_pred_labels)
-    r = recall_score(all_true_labels, all_pred_labels)
-    f1 = 2 * r * p / (r + p) if r + p > 0 else 0
+    #p = precision_score(all_true_labels, all_pred_labels)
+    #r = recall_score(all_true_labels, all_pred_labels)
+    #f1 = 2 * r * p / (r + p) if r + p > 0 else 0
     return p, r, f1
 
 if __name__ == '__main__':
