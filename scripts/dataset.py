@@ -1,7 +1,7 @@
 import torch
 import torchtext
 from torchtext.data import Field
-from labels import PAD, UNK, COMMA
+from labels import PAD, UNK, COMMA, NEWLINE
 
 
 class ChemdnerDataset(torchtext.data.Dataset):
@@ -13,8 +13,8 @@ class ChemdnerDataset(torchtext.data.Dataset):
 
     def __init__(self, path, fields=None, **kwargs):
         if not fields:
-            self.text_field = Field(sequential=True, tensor_type=torch.LongTensor, batch_first=True)
-            self.label_field = Field(sequential=True, batch_first=True)
+            self.text_field = Field(sequential=True, tensor_type=torch.LongTensor, use_vocab=True)
+            self.label_field = Field(sequential=True)
             fields = [('text', self.text_field), ('label', self.label_field)]
 
         examples = []
@@ -36,7 +36,7 @@ class ChemdnerDataset(torchtext.data.Dataset):
         return self.text_field.vocab.stoi, self.label_field.vocab.stoi
 
     def get_id2token(self, tokenize=list):
-        id2token = [PAD, UNK, COMMA, '<pad>']
+        id2token = [PAD, UNK, COMMA, '<pad>', NEWLINE]
         for example in self.examples:
             for token in list(''.join(example.text)):
                 if not token in id2token:

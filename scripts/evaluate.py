@@ -10,10 +10,10 @@ from seqeval.metrics.sequence_labeling import get_entities
 from tqdm import tqdm
 from labels import COMMA
 import argparse
-from utils import get_variable
+from utils import get_variable, tokens_batch2subwords
 
 
-def evaluate(dataset, model, batch_size, text_field, label_field, id2label, verbose=1, use_gpu=True, use_eval_batch_len=-1):
+def evaluate(dataset, model, batch_size, text_field, label_field, id2label, id2char, verbose=1, use_gpu=True, use_eval_batch_len=-1):
     all_true_labels = []
     all_pred_labels = []
     model.eval()
@@ -31,7 +31,11 @@ def evaluate(dataset, model, batch_size, text_field, label_field, id2label, verb
         #pred_labels = [[id2label[label_id] for label_id in batch] for batch in label_ids.transpose(1, 0)]
         
         ###### LSTM CRF ########
-        label_ids = model(get_variable(texts, use_gpu=use_gpu))
+        subwords = tokens_batch2subwords(tokens, id2char=id2char, tokenize=lambda x: list(x))
+        input_tensor = get_variable(texts, use_gpu=use_gpu)
+        subwords_tensor = get_variable(subwords, use_gpu=use_gpu)
+        label_ids = model(input_tensor, subwords_tensor)
+
         pred_labels = [[id2label[int(label_id)] for label_id in batch] for batch in label_ids]
         # all_true_labels.extend([t for true_label in true_labels for t in true_label])
         # all_pred_labels.extend([p for pred_label in pred_labels for p in pred_label])
