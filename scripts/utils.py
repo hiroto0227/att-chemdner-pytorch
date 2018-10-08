@@ -1,9 +1,6 @@
 import os
-<<<<<<< HEAD
 import numpy as np
-=======
 from collections import deque
->>>>>>> 325867741129368dffe36d86e449df0979a23fa7
 import torch
 from torch.autograd import Variable
 from labels import UNK, PAD, COMMA
@@ -26,7 +23,6 @@ def checkpoint(epoch, model, model_path, batch_size, interrupted=False, use_gpu=
     torch.save(model.state_dict(), os.path.join(model_dir, model_name))
 
 
-<<<<<<< HEAD
 def make_subwords_from_token_batches(token_batch, id2token, id2char, tokenize, batch_first=True):
     """入力のtokenをsubword化して返す。
     input:token_batch
@@ -51,7 +47,8 @@ def make_subwords_from_token_batches(token_batch, id2token, id2char, tokenize, b
     padded_subwords = [[np.pad(subwords, mode='constant', pad_width=(0, max_subword_length - len(subwords)))
                         for subwords in batch] for batch in subword_batch]
     return torch.LongTensor(padded_subwords) # (batch_size, seq_len, subword_size)  
-=======
+
+
 class EarlyStop():
     def __init__(self, stop_not_rise_num=5, threshold_rate=0.1):
         self.stop_not_rise_num = stop_not_rise_num
@@ -65,4 +62,3 @@ class EarlyStop():
             return False
         else:
             return True
->>>>>>> 325867741129368dffe36d86e449df0979a23fa7
