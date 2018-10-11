@@ -33,7 +33,7 @@ if __name__ == '__main__':
     opt = parser.parse_args()
     
     CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-    MODEL_PATH = os.path.join(CURRENT_DIR, '../models/', 'bilstm_crf_{}_{}bs'.format(datetime.now().strftime("%Y%m%d%H%M"), opt.batch_size))
+    MODEL_PATH = os.path.join(CURRENT_DIR, '../models/', 'bilstm_crf_{}_{}bs'.format(datetime.now().strftime("%m%d%H%M"), opt.batch_size))
     RESULT_PATH = os.path.join(CURRENT_DIR, '../results/')
 
     ########### data load #################
@@ -77,9 +77,6 @@ if __name__ == '__main__':
                 model.zero_grad()
                 model.train()
                 
-                print('input: {}'.format(input_tensor.shape))
-                print('subwords: {}'.format(subwords_tensor.shape))
-                
                 ###### LSTM ##########
                 #output = model(input_tensor) # (seq_length, batch_size, tag_size)
                 #loss = F.nll_loss(output.view(-1, len(label2id)), output_tensor.view(-1).cpu())
@@ -88,7 +85,7 @@ if __name__ == '__main__':
                 ####### BiLSTM CRF ########
                 loss = model.loss(input_tensor, subwords_tensor, target_tensor) / input_tensor.size(0)
                 ####### BiLSTM CRF ########
-                print('loss: {}'.format(float(loss)))
+                # print('loss: {}'.format(float(loss)))
                 loss.backward()
                 optimizer.step()
                 loss_per_epoch += float(loss)
@@ -99,7 +96,7 @@ if __name__ == '__main__':
                 traceback.print_exc()
                 sys.exit(1)
 
-        if epoch % 5 == 1:
+        if epoch % 5 == 0:
             precision, recall, f1_score = evaluate(dataset=valid_dataset, 
                                                    model=model,
                                                    batch_size=opt.batch_size,
