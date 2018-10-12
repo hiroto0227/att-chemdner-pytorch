@@ -12,15 +12,15 @@ from dataset import ChemdnerSubwordDataset
 from model.char_lstm_crf import CharLSTMCRFTagger
 from evaluate_char_lstm_crf import evaluate
 import pandas as pd
-from utils import EarlyStop, get_variable, checkpoint, make_subwords_from_token_batches
+from utils import EarlyStop, get_variable, checkpoint
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='deep image inpainting')
     parser.add_argument('--batch_size', type=int, default=10, help='training batch size')
     parser.add_argument('--epoch', type=int, default=1, help='training epoch')
-    parser.add_argument('--embed_dim', type=int, default=300, help='embedding dim')
-    parser.add_argument('--hidden_dim', type=int, default=1000, help='hidden dim')
+    parser.add_argument('--embed_dim', type=int, default=100, help='embedding dim')
+    parser.add_argument('--hidden_dim', type=int, default=50, help='hidden dim')
     parser.add_argument('--num_layers', type=int, default=1, help='num layers')
     parser.add_argument('--early_stop', action='store_true')
     parser.add_argument('--gpu', action='store_true')
@@ -79,26 +79,25 @@ if __name__ == '__main__':
                 traceback.print_exc()
                 sys.exit(1)
 
-        precision, recall, f1_score = evaluate(dataset=valid_dataset, 
-                                                   model=model,
-                                                   batch_size=opt.batch_size,
-                                                   text_field=train_dataset.text_field,
-                                                   label_field=train_dataset.label_field,
-                                                   id2label=id2label,
-                                                   id2char=id2char,
-                                                   verbose=0,
-                                                   use_gpu=opt.gpu)
-            if early_stopping.is_end(f1_score):
-                break
+        precision, recall, f1_score = evaluate(dataset=valid_dataset,
+                                               model=model,
+                                               batch_size=opt.batch_size,
+                                               text_field=train_dataset.fields["char"],
+                                               label_field=train_dataset.fields["label"],
+                                               id2label=id2label,
+                                               id2char=id2char,
+                                               verbose=0,
+                                               use_gpu=opt.gpu)
+        if early_stopping.is_end(f1_score):
+            break
 
         df_epoch_results = df_epoch_results.append(pd.Series({'epoch': epoch,
-                           'loss': loss_per_epoch,
-                           'valid_precision': precision,
-                           'valid_recall': recall,
-                           'valid_fscore': f1_score,
-                           'time': time.time() - start}), ignore_index=True)
+                                                              'loss': loss_per_epoch,
+                                                              'valid_precision': precision,
+                                                              'valid_recall': recall,
+                                                              'valid_fscore': f1_score,
+                                                              'time': time.time() - start}), ignore_index=True)
 
         print('{}epoch\nloss: {}\nvalid: {}\ntime: {} sec.\n'.format(epoch, loss_per_epoch, f1_score, time.time() - start))
-    
     checkpoint(epoch, model, MODEL_PATH, batch_size=opt.batch_size, use_gpu=opt.gpu)
     df_epoch_results.to_csv(os.path.join(RESULT_PATH, 'result_epoch_{}.csv'.format(MODEL_PATH.split('/')[-1])), float_format='%.3f')
