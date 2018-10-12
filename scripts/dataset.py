@@ -105,8 +105,8 @@ class ChemdnerDataset(torchtext.data.Dataset):
         with open(path) as f:
             rows = f.read().split('\n')
             for i, row in enumerate(rows):
-                if i == 10:
-                    break
+                #if i == 10:
+                #    break
                 splitted_row = row.split(',')
                 length = len(splitted_row) // 2
                 tokens, labels = splitted_row[:length], splitted_row[length:]
