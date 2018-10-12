@@ -96,7 +96,7 @@ if __name__ == '__main__':
                 traceback.print_exc()
                 sys.exit(1)
 
-        if epoch % 5 == 0:
+        if epoch % 5 == 1:
             precision, recall, f1_score = evaluate(dataset=valid_dataset, 
                                                    model=model,
                                                    batch_size=opt.batch_size,
