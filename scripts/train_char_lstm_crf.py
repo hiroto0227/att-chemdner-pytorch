@@ -1,29 +1,23 @@
 import argparse
-import os, sys
+import os
+import sys
 import traceback
-import numpy as np
 from datetime import datetime
 from tqdm import tqdm
 import time
 import torch
-from torch.nn.utils.rnn import pack_sequence, pad_sequence
-import torchtext
-from torchtext.data import BucketIterator, Iterator
+from torchtext.data import BucketIterator
 from torch import optim
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.autograd import Variable
-from dataset import ChemdnerDataset
-from model.lstm_crf import LSTMCRFTagger
-from model.attention_lstm import Att_LSTM
-from evaluate import evaluate
+from dataset import ChemdnerSubwordDataset
+from model.char_lstm_crf import CharLSTMCRFTagger
+from evaluate_char_lstm_crf import evaluate
 import pandas as pd
 from utils import EarlyStop, get_variable, checkpoint, make_subwords_from_token_batches
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='deep image inpainting')
-    parser.add_argument('--batch_size', type=int, default=50, help='training batch size')
+    parser.add_argument('--batch_size', type=int, default=10, help='training batch size')
     parser.add_argument('--epoch', type=int, default=1, help='training epoch')
     parser.add_argument('--embed_dim', type=int, default=300, help='embedding dim')
     parser.add_argument('--hidden_dim', type=int, default=1000, help='hidden dim')
@@ -31,28 +25,26 @@ if __name__ == '__main__':
     parser.add_argument('--early_stop', action='store_true')
     parser.add_argument('--gpu', action='store_true')
     opt = parser.parse_args()
-    
+
     CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
     MODEL_PATH = os.path.join(CURRENT_DIR, '../models/', 'bilstm_crf_{}_{}bs'.format(datetime.now().strftime("%Y%m%d%H%M"), opt.batch_size))
     RESULT_PATH = os.path.join(CURRENT_DIR, '../results/')
 
     ########### data load #################
-    train_dataset = ChemdnerDataset(path=os.path.join(CURRENT_DIR, '../datas/processed/train.csv'))
-    token2id, label2id = train_dataset.make_vocab()
-    id2token, id2label = [k for k, v in token2id.items()], [k for k, v in label2id.items()]
-    id2char = train_dataset.get_id2token(tokenize=str.split)
-    valid_dataset = ChemdnerDataset(path=os.path.join(CURRENT_DIR, '../datas/processed/valid.csv'))
+    train_dataset = ChemdnerSubwordDataset(path=os.path.join(CURRENT_DIR, '../datas/raw/train'))
+    train_dataset.make_vocab()
+    char2id, label2id = train_dataset.fields["char"].vocab.stoi, train_dataset.fields["label"].vocab.stoi
+    id2char, id2label = [k for k, v in char2id.items()], [k for k, v in label2id.items()]
+    valid_dataset = ChemdnerSubwordDataset(path=os.path.join(CURRENT_DIR, '../datas/raw/valid'))
 
-    model = LSTMCRFTagger(vocab_dim=len(token2id),
-                          tag_dim=len(label2id),
-                          batch_size=opt.batch_size,
-                          embed_dim=opt.embed_dim,
-                          hidden_dim=opt.hidden_dim,
-                          num_layers=opt.num_layers,
-                          use_gpu=opt.gpu,
-                          alphabet_size=len(id2char))
-
-    print(model)
+    model = CharLSTMCRFTagger(vocab_dim=len(char2id),
+                              tag_dim=len(label2id),
+                              batch_size=opt.batch_size,
+                              embed_dim=opt.embed_dim,
+                              hidden_dim=opt.hidden_dim,
+                              num_layers=opt.num_layers,
+                              use_gpu=opt.gpu)
+    print("\nmodel: {}\n".format(model))
     if opt.gpu and torch.cuda.is_available():
         print('\n=============== use GPU =================\n')
         model.cuda()
@@ -70,25 +62,12 @@ if __name__ == '__main__':
         for batch_i, batch in tqdm(enumerate(train_iter)):
             try:
                 batch_start = time.time()
-                subwords = make_subwords_from_token_batches(batch.text, id2token=id2token, id2char=id2char, tokenize=lambda x: list(x)) # (batch_size, seq_length, subword_length)
-                
-                subwords_tensor = get_variable(subwords, use_gpu=opt.gpu)
-                input_tensor = get_variable(batch.text, use_gpu=opt.gpu)
+                input_tensor = get_variable(batch.char, use_gpu=opt.gpu)
                 target_tensor = get_variable(batch.label, use_gpu=opt.gpu)
                 model.zero_grad()
                 model.train()
-                
                 print('input: {}'.format(input_tensor.shape))
-                print('subwords: {}'.format(subwords_tensor.shape))
-                
-                ###### LSTM ##########
-                #output = model(input_tensor) # (seq_length, batch_size, tag_size)
-                #loss = F.nll_loss(output.view(-1, len(label2id)), output_tensor.view(-1).cpu())
-                ###### LStm ##########
-
-                ####### BiLSTM CRF ########
-                loss = model.loss(input_tensor, subwords_tensor, target_tensor) / input_tensor.size(0)
-                ####### BiLSTM CRF ########
+                loss = model.loss(input_tensor, target_tensor) / input_tensor.size(0)
                 print('loss: {}'.format(float(loss)))
                 loss.backward()
                 optimizer.step()
@@ -100,8 +79,7 @@ if __name__ == '__main__':
                 traceback.print_exc()
                 sys.exit(1)
 
-        if epoch % 5 == 1:
-            precision, recall, f1_score = evaluate(dataset=valid_dataset, 
+        precision, recall, f1_score = evaluate(dataset=valid_dataset, 
                                                    model=model,
                                                    batch_size=opt.batch_size,
                                                    text_field=train_dataset.text_field,
