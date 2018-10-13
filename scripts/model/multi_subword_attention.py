@@ -12,7 +12,7 @@ class Attention(nn.Module):
 
     def _get_scores(self, x):
         """xの総当たりの類似度を求める。"""
-        # (B, N ,H) x (B, H, N) = (B, N, N)
+        # (B, N, Embed) x (B, Embed, N) = (B, N, N)
         x = x.transpose(1, 0)
         norm = torch.norm(x.float(), dim=2).unsqueeze(2)
         scores = torch.bmm(x / norm, (x / norm).transpose(2, 1))
