@@ -1,5 +1,5 @@
 import os
-from eqeval.metrics.sequence_labeling import get_entities
+from seqeval.metrics.sequence_labeling import get_entities
 from labels import O, S, B, I, E
 
 
