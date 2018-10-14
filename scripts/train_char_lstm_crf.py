@@ -27,7 +27,7 @@ if __name__ == '__main__':
     opt = parser.parse_args()
 
     CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-    MODEL_PATH = os.path.join(CURRENT_DIR, '../models/', 'bilstm_crf_{}_{}bs'.format(datetime.now().strftime("%Y%m%d%H%M"), opt.batch_size))
+    MODEL_PATH = os.path.join(CURRENT_DIR, '../models/', 'char_bilstm_crf_{}_{}bs'.format(datetime.now().strftime("%Y%m%d%H%M"), opt.batch_size))
     RESULT_PATH = os.path.join(CURRENT_DIR, '../results/')
 
     ########### data load #################
@@ -79,17 +79,18 @@ if __name__ == '__main__':
                 traceback.print_exc()
                 sys.exit(1)
 
-        precision, recall, f1_score = evaluate(dataset=valid_dataset,
-                                               model=model,
-                                               batch_size=opt.batch_size,
-                                               text_field=train_dataset.fields["char"],
-                                               label_field=train_dataset.fields["label"],
-                                               id2label=id2label,
-                                               id2char=id2char,
-                                               verbose=0,
-                                               use_gpu=opt.gpu)
-        if early_stopping.is_end(f1_score):
-            break
+        if epoch % 5 == 1:
+            precision, recall, f1_score = evaluate(dataset=valid_dataset,
+                                                   model=model,
+                                                   batch_size=opt.batch_size,
+                                                   text_field=train_dataset.fields["char"],
+                                                   label_field=train_dataset.fields["label"],
+                                                   id2label=id2label,
+                                                   id2char=id2char,
+                                                   verbose=0,
+                                                   use_gpu=opt.gpu)
+            if early_stopping.is_end(f1_score):
+                break
 
         df_epoch_results = df_epoch_results.append(pd.Series({'epoch': epoch,
                                                               'loss': loss_per_epoch,

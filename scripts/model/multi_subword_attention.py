@@ -3,7 +3,7 @@ import torch.nn as nn
 from torchcrf import CRF
 import sys
 sys.path.append('..')
-# from utils import get_variable
+from utils import get_variable
 
 
 class MultiSubwordAttentionTagger(nn.Module):
@@ -26,6 +26,7 @@ class MultiSubwordAttentionTagger(nn.Module):
         for i, embed_sub in enumerate(self.embed_subs):
             embed_subs.append(embed_sub(x_subs[i]))
         embed = torch.cat([embed_char] + embed_subs, dim=2)
+        embed = get_variable(embed, use_gpu=self.use_gpu)
         h = self.x2h(embed)
         for i, h2h in enumerate(self.h2hs):
             h = h2h(h)
