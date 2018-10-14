@@ -5,6 +5,7 @@ from dataset import ChemdnerDataset
 from model.lstm_crf import LSTMCRFTagger
 from seqeval.metrics.sequence_labeling import get_entities
 from tqdm import tqdm
+from utils import get_variable
 import argparse
 
 
@@ -17,7 +18,8 @@ def evaluate(dataset, model, batch_size, text_field, label_field, id2label, id2c
     for batch_i, batch in tqdm(enumerate(eval_iter.batches)):
         label_sequences = label_field.process([b.label for b in batch], device=-1, train=False)
         true_labels = [[id2label[label_id] for label_id in batch] for batch in label_sequences.transpose(1, 0)]
-        label_ids = model(text_field.process([b.char for b in batch], device=-1, train=False))
+        input_tensor = get_variable(text_field.process([b.char for b in batch], device=-1, train=False), use_gpu=use_gpu)
+        label_ids = model(input_tensor)
         pred_labels = [[id2label[int(label_id)] for label_id in batch] for batch in label_ids]
 
         ###### CHEM以外のラベルを削除。

@@ -26,8 +26,8 @@ class ChemdnerSubwordDataset(torchtext.data.Dataset):
                 self.fields.append((name, Field(sequential=True, tensor_type=torch.LongTensor, use_vocab=True)))
             self.fields.append(('label', Field(sequential=True)))
         examples = []
-        for i, fileid in tqdm(enumerate([filename.replace('.txt', '') for filename in os.listdir(path) if filename.endswith('.txt')])):
-            #if i == 10:
+        for i, fileid in enumerate([filename.replace('.txt', '') for filename in os.listdir(path) if filename.endswith('.txt')]):
+            #if i == 20:
             #    break
             char_sequence, label_sequence = file2sequences(path, fileid)
             subword_sequences = [char2token(char_sequence, tokenizer, tokenized_padding="copy") for tokenizer in subword_tokenizers.values()]
