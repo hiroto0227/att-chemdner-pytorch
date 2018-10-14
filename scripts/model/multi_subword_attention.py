@@ -3,7 +3,7 @@ import torch.nn as nn
 from torchcrf import CRF
 import sys
 sys.path.append('..')
-# from utils import get_variable
+from utils import get_variable
 
 
 class Attention(nn.Module):
@@ -42,7 +42,7 @@ class MultiSubwordAttentionTagger(nn.Module):
         self.use_gpu = use_gpu
 
         self.embed_char = nn.Embedding(char_vocab_dim, char_embed_dim)
-        self.embed_subs = [nn.Embedding(vocab_dim, embed_dim) for vocab_dim, embed_dim in zip(sub_vocab_dims, sub_embed_dims)]
+        self.embed_subs = [nn.Embedding(vocab_dim, embed_dim).cuda() for vocab_dim, embed_dim in zip(sub_vocab_dims, sub_embed_dims)]
         self.x2h = nn.Linear(char_embed_dim + sum(sub_embed_dims), hidden_dim)
         self.h2hs = []
         self.attention_subs = [Attention() for i in range(len(sub_vocab_dims))]
@@ -56,6 +56,7 @@ class MultiSubwordAttentionTagger(nn.Module):
         for i, embed_sub in enumerate(self.embed_subs):
             embed_subs.append(embed_sub(x_subs[i]))
         embed = torch.cat([embed_char] + embed_subs, dim=2)
+        embe = get_variable(embed, use_gpu=self.use_gpu)
         h = self.x2h(embed)
         for i, h2h in enumerate(self.h2hs):
             h = h2h(h)
