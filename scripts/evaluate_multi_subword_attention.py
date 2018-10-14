@@ -11,20 +11,23 @@ from data.processed import tokenize
 from utils import get_variable
 
 
-def evaluate(dataset, model, batch_size, train_fields, verbose=1, use_gpu=True, use_eval_batch_len=-1):
+def evaluate(dataset, model, batch_size, train_fields, subword_tokenizers, verbose=1, use_gpu=True):
     precisions, recalls, fscores = [], [], []
     model.eval()
     eval_iter = Iterator(dataset, batch_size=batch_size, shuffle=False, repeat=False)
     eval_iter.create_batches()
+    id2label = train_fields["label"].vocab.itos
 
+    TP = 0
+    pred_num = 0
+    true_num = 0
     for batch_i, batch in tqdm(enumerate(eval_iter.batches)):
-        label_sequences = train_dataset.fields["label"].process([b.label for b in batch], device=-1, train=False)
+        label_sequences = train_fields["label"].process([b.label for b in batch], device=-1, train=False)
         true_labels = [[id2label[label_id] for label_id in batch] for batch in label_sequences.transpose(1, 0)]
-        x_char = get_variable(train_dataset.fields["char"].process([b.char for b in batch], device=-1, train=False))
+        x_char = get_variable(train_fields["char"].process([b.char for b in batch], device=-1, train=False), use_gpu=use_gpu)
         x_subs = []
         for name in subword_tokenizers.keys():
-            for b in batch:
-                x_subs.append(get_variable(train_dataset.fields[name].process(b.__getattribute__(name), device=-1, train=False)))
+           x_subs.append(get_variable(train_fields[name].process([b.__getattribute__(name) for b in batch], device=-1, train=False), use_gpu=use_gpu))
         label_ids = model(x_char, x_subs)
         pred_labels = [[id2label[int(label_id)] for label_id in batch] for batch in label_ids]
 
@@ -32,24 +35,16 @@ def evaluate(dataset, model, batch_size, train_fields, verbose=1, use_gpu=True, 
         true_entities = [true_entity for true_entity in get_entities(true_labels) if true_entity[0] == "CHEM"]
         pred_entities = [pred_entity for pred_entity in get_entities(pred_labels) if pred_entity[0] == "CHEM"]
 
-        TP = 0
-        pred_num = len(pred_entities)
-        true_num = len(true_entities)
+        pred_num += len(pred_entities)
+        true_num += len(true_entities)
         for i, true_entity in enumerate(true_entities):
             for j, pred_entity in enumerate(pred_entities):
                 if true_entity == pred_entity:
                     TP += 1
-        p = TP / pred_num if pred_num > 0 else 0
-        r = TP / true_num if true_num > 0 else 0
-        f = 2 * p * r / (p + r) if p + r > 0 else 0
-        precisions.append(p)
-        recalls.append(r)
-        fscores.append(f)
-        print("true_num: {}, pred_num: {}, TP: {}, precision: {}, recall: {}, fscore: {}".format(true_num, pred_num, TP, p, r, f))
-    precision = sum(precisions) / len(precisions)
-    recall = sum(recalls) / len(recalls)
-    fscore = sum(fscores) / len(fscores)
-
+    precision = TP / pred_num if pred_num > 0 else 0
+    recall = TP / true_num if true_num > 0 else 0
+    fscore = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0
+    print("true_num: {}, pred_num: {}, TP: {}, precision: {}, recall: {}, fscore: {}".format(true_num, pred_num, TP, precision, recall, fscore))
     return precision, recall, fscore
 
 
