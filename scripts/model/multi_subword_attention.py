@@ -4,6 +4,29 @@ from torchcrf import CRF
 import sys
 sys.path.append('..')
 from utils import get_variable
+from memory_profiler import profile
+
+from itertools import chain
+from collections import deque
+
+def total_size(obj, verbose=False):
+    seen = set()
+    def sizeof(o):
+        if id(o) in seen:
+            return 0
+        seen.add(id(o))
+        s = sys.getsizeof(o, default=0)
+        if verbose:
+            print(s, type(o), repr(o))
+        if isinstance(o, (tuple, list, set, frozenset, deque)):
+            s += sum(map(sizeof, iter(o)))
+        elif isinstance(o, dict):
+            s += sum(map(sizeof, chain.from_iterable(o.items())))
+        elif "__dict__" in dir(o):  # ?~B~B?~A??~A??~I??~A~D?~V??~U?~A??~A~B?~B~K?~A??~A~Z
+            s += sum(map(sizeof, chain.from_iterable(o.__dict__.items())))
+        return s
+
+    return sizeof(obj)
 
 
 class MultiSubwordAttentionTagger(nn.Module):
@@ -17,16 +40,19 @@ class MultiSubwordAttentionTagger(nn.Module):
         self.h2hs = []
         self.attention_subs = [Attention() for i in range(len(sub_vocab_dims))]
         self.hg2z = nn.Linear(hidden_dim * (1 + len(sub_vocab_dims)), tag_dim)
+        #self.hg2z = nn.Linear(hidden_dim, tag_dim)
         self.z2zs = []
         self.crf = CRF(tag_dim)
-
+    
     def _forward(self, x_char, x_subs):
         embed_char = self.embed_char(x_char)
         embed_subs = []
         for i, embed_sub in enumerate(self.embed_subs):
             embed_subs.append(embed_sub(x_subs[i]))
         embed = torch.cat([embed_char] + embed_subs, dim=2)
+        del embed_char
         embed = get_variable(embed, use_gpu=self.use_gpu)
+        #hg = self.x2h(embed)
         h = self.x2h(embed)
         for i, h2h in enumerate(self.h2hs):
             h = h2h(h)
@@ -34,6 +60,7 @@ class MultiSubwordAttentionTagger(nn.Module):
         for i, attention_sub in enumerate(self.attention_subs):
             g_subs.append(attention_sub(embed_subs[i], h))
         hg = torch.cat([h] + g_subs, dim=2)
+        del g_subs, embed_subs
         z = self.hg2z(hg)
         for i, z2z in enumerate(self.z2zs):
             z = self.z2z(z)
@@ -41,20 +68,21 @@ class MultiSubwordAttentionTagger(nn.Module):
 
     def loss(self, x_char, x_subs, y):
         z = self._forward(x_char, x_subs)
-        log_likelihood = self.crf(z, y)
+        log_likelihood = self.crf(z, y)  # メモリをたくさん使う。
         # log_likelihoodを最大にすれば良いが、最小化するので-1をかけている。
         return -1 * log_likelihood
 
     def forward(self, x_char, x_subs):
         z = self._forward(x_char, x_subs)
         decoded = torch.FloatTensor(self.crf.decode(z))
+
         return decoded
 
 
 class Attention(nn.Module):
     def __init__(self):
         super().__init__()
-
+    @profile
     def _get_scores(self, x):
         """xの総当たりの類似度を求める。"""
         # (B, N ,H) x (B, H, N) = (B, N, N)
@@ -62,7 +90,7 @@ class Attention(nn.Module):
         norm = torch.norm(x.float(), dim=2).unsqueeze(2)
         scores = torch.bmm(x / norm, (x / norm).transpose(2, 1))
         return scores  # (B, N_t, N_j)
-
+    
     def forward(self, x, h):
         """
         input:
