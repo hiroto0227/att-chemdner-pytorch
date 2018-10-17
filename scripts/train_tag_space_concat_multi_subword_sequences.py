@@ -10,7 +10,7 @@ from torchtext.data import BucketIterator
 from torch import optim
 from dataset import ChemdnerSubwordDataset
 from model.tag_space_concat_multi_subword_sequences import TagSpaceConcatMultiSubwordSequences
-from evaluate_char_lstm_crf import evaluate
+from evaluate_tag_space_concat_multi_subword_sequences import evaluate
 import pandas as pd
 from data.processed import tokenize
 from utils import EarlyStop, get_variable, checkpoint
@@ -39,10 +39,10 @@ if __name__ == '__main__':
     train_dataset.make_vocab()
     char2id, label2id = train_dataset.fields["char"].vocab.stoi, train_dataset.fields["label"].vocab.stoi
     id2char, id2label = [k for k, v in char2id.items()], [k for k, v in label2id.items()]
-    valid_dataset = ChemdnerSubwordDataset(path=os.path.join(CURRENT_DIR, '../datas/raw/valid'))
+    valid_dataset = ChemdnerSubwordDataset(path=os.path.join(CURRENT_DIR, '../datas/raw/valid'), subword_tokenizers=subword_tokenizers)
 
     model = TagSpaceConcatMultiSubwordSequences(char_vocab_dim=len(train_dataset.fields["char"].vocab.itos),
-                                                char_embed_dim=50,
+                                                char_embed_dim=100,
                                                 sub_vocab_dims=[len(train_dataset.fields[name].vocab.itos) for name in subword_tokenizers.keys()],
                                                 sub_embed_dims=[100 for i in range(len(subword_tokenizers))],
                                                 char_hidden_dim=opt.hidden_dim,
@@ -89,6 +89,7 @@ if __name__ == '__main__':
                                                model=model,
                                                batch_size=opt.batch_size,
                                                train_fields=train_dataset.fields,
+                                               subword_tokenizers=subword_tokenizers,
                                                verbose=0,
                                                use_gpu=opt.gpu)
         if early_stopping.is_end(f1_score):

@@ -34,9 +34,9 @@ class TagSpaceConcatMultiSubwordSequences(nn.Module):
         super().__init__()
         self.use_gpu = use_gpu
         self.embed_char = nn.Embedding(char_vocab_dim, char_embed_dim)
-        self.embed_subs = [nn.Embedding(vocab_dim, embed_dim, tag_dim) for vocab_dim, embed_dim in zip(sub_vocab_dims, sub_embed_dims)]
+        self.embed_subs = [nn.Embedding(vocab_dim, embed_dim, tag_dim).cuda() for vocab_dim, embed_dim in zip(sub_vocab_dims, sub_embed_dims)]
         self.lstm_block_char = BiLSTMBlock(char_embed_dim, char_hidden_dim, tag_dim, batch_size)
-        self.lstm_block_subs = [BiLSTMBlock(embed_dim, hidden_dim, tag_dim, batch_size) for embed_dim, hidden_dim in zip(sub_embed_dims, sub_hidden_dims)]
+        self.lstm_block_subs = [BiLSTMBlock(embed_dim, hidden_dim, tag_dim, batch_size).cuda() for embed_dim, hidden_dim in zip(sub_embed_dims, sub_hidden_dims)]
         self.outs2tag = nn.Linear(tag_dim * (1 + len(sub_hidden_dims)), tag_dim)
         self.crf = CRF(tag_dim)
 
