@@ -27,15 +27,14 @@ class ChemdnerSubwordDataset(torchtext.data.Dataset):
             self.fields.append(('label', Field(sequential=True)))
         examples = []
         for i, fileid in tqdm(enumerate([filename.replace('.txt', '') for filename in os.listdir(path) if filename.endswith('.txt')])):
-            #if i == 10:
-            #    break
+            if i == 10:
+                break
             char_sequence, label_sequence = file2sequences(path, fileid)
             subword_sequences = [char2token(char_sequence, tokenizer, tokenized_padding="copy") for tokenizer in subword_tokenizers.values()]
             examples.append(torchtext.data.Example.fromlist([char_sequence] + subword_sequences + [label_sequence], self.fields))
         super(ChemdnerSubwordDataset, self).__init__(examples, self.fields, **kwargs)
 
     def make_vocab(self, load_vector_field_names=[]):
-        print(self.fields.items())
         for field_name, field in self.fields.items():
             field.build_vocab(self)
             if field_name in load_vector_field_names:
