@@ -12,7 +12,7 @@ class MultiSubwordAttentionTagger(nn.Module):
         self.use_gpu = use_gpu
 
         self.embed_char = nn.Embedding(char_vocab_dim, char_embed_dim)
-        self.embed_subs = [nn.Embedding(vocab_dim, embed_dim) for vocab_dim, embed_dim in zip(sub_vocab_dims, sub_embed_dims)]
+        self.embed_subs = [nn.Embedding(vocab_dim, embed_dim).cuda() for vocab_dim, embed_dim in zip(sub_vocab_dims, sub_embed_dims)]
         self.x2h = nn.Linear(char_embed_dim + sum(sub_embed_dims), hidden_dim)
         self.h2hs = []
         self.attention_subs = [Attention() for i in range(len(sub_vocab_dims))]
@@ -75,7 +75,7 @@ class Attention(nn.Module):
         scores = nn.functional.softmax(self._get_scores(x), dim=2)  # (B, Nt, Nj)
         scores = scores.unsqueeze(-1).expand(B, N, N, H)  # (B, Nt, Nj, H)
         scores = scores.transpose(3, 2).view(-1, H, N)
-        h = h.transpose(1, 0).contiguous().unsqueeze(1).expand(B, N, N, H).view(-1, N, H)
+        h = h.transpose(1, 0).contiguous().unsqueeze(1).expand(B, N, N, H).contiguous().view(-1, N, H)
         g = torch.bmm(scores, h)  # (B, Nt, H, Nj) x (B, Nt, H) -> (B, Nt, H, H)
         g = g.sum(1).view(B, N, -1).transpose(1, 0)
         return g / g.float().norm()  # (Nt, B, H)

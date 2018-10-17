@@ -11,7 +11,7 @@ from torchtext.data import BucketIterator
 from torch import optim
 from dataset import ChemdnerSubwordDataset
 from model.multi_subword_attention import MultiSubwordAttentionTagger
-from evaluate_char_lstm_crf import evaluate
+from evaluate_multi_subword_attention import evaluate
 import pandas as pd
 from data.processed import tokenize
 from utils import EarlyStop, get_variable, checkpoint
@@ -42,16 +42,15 @@ if __name__ == '__main__':
 
     ########### data load #################
     subword_tokenizers = {
-        "sub1": sub1_tokenize,
-        "sub2": sub2_tokenize,
-        "sub3": tokenize
+        "sub1": tokenize
+        #"sub2": sub2_tokenize,
+        #"sub3": tokenize
     }
     train_dataset = ChemdnerSubwordDataset(path=os.path.join(CURRENT_DIR, '../datas/raw/train'), subword_tokenizers=subword_tokenizers)
     train_dataset.make_vocab()
-    print(train_dataset)
     char2id, label2id = train_dataset.fields["char"].vocab.stoi, train_dataset.fields["label"].vocab.stoi
     id2char, id2label = [k for k, v in char2id.items()], [k for k, v in label2id.items()]
-    valid_dataset = ChemdnerSubwordDataset(path=os.path.join(CURRENT_DIR, '../datas/raw/valid'))
+    valid_dataset = ChemdnerSubwordDataset(path=os.path.join(CURRENT_DIR, '../datas/raw/valid'), subword_tokenizers=subword_tokenizers)
 
     model = MultiSubwordAttentionTagger(char_vocab_dim=len(train_dataset.fields["char"].vocab.itos),
                                         sub_vocab_dims=[len(train_dataset.fields[name].vocab.itos) for name in subword_tokenizers.keys()],
@@ -85,7 +84,7 @@ if __name__ == '__main__':
                 model.zero_grad()
                 model.train()
                 loss = model.loss(x_char, x_subs, y) / x_char.size(0)
-                print('loss: {}'.format(float(loss)))
+                # print('loss: {}'.format(float(loss)))
                 loss.backward()
                 optimizer.step()
                 loss_per_epoch += float(loss)
@@ -95,15 +94,16 @@ if __name__ == '__main__':
                 df_epoch_results.to_csv(os.path.join(RESULT_PATH, 'result_epoch_{}.csv'.format(MODEL_PATH.split('/')[-1])), float_format='%.3f')
                 traceback.print_exc()
                 sys.exit(1)
-
-        precision, recall, f1_score = evaluate(dataset=valid_dataset,
-                                               model=model,
-                                               batch_size=opt.batch_size,
-                                               train_fields=train_dataset.fields,
-                                               verbose=0,
-                                               use_gpu=opt.gpu)
-        if early_stopping.is_end(f1_score):
-            break
+        if epoch % 5 == 1:
+            precision, recall, f1_score = evaluate(dataset=valid_dataset,
+                                                   model=model,
+                                                   batch_size=opt.batch_size,
+                                                   train_fields=train_dataset.fields,
+                                                   subword_tokenizers=subword_tokenizers,
+                                                   verbose=0,
+                                                   use_gpu=opt.gpu)
+            if early_stopping.is_end(f1_score):
+                break
 
         df_epoch_results = df_epoch_results.append(pd.Series({'epoch': epoch,
                                                               'loss': loss_per_epoch,
