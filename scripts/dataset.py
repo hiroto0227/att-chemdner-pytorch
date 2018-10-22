@@ -1,10 +1,24 @@
 import os
 import torch
 import torchtext
-from torchtext.data import Field
+from torchtext.data import ReversibleField, Field
 from tqdm import tqdm
 from labels import PAD, UNK, COMMA, NEWLINE
-from datautils import char2token, file2sequences
+from datautils import char2token, file2sequences, file2char_level_sequences
+
+
+class TokenizeDataset(torchtext.data.Dataset):
+    def __init__(self, path, tokenizer, **kwargs):
+        self.token_field = ReversibleField(sequential=True, tensor_type=torch.LongTensor, use_vocab=True)
+        self.label_field = ReversibleField(sequential=True, use_vocab=True)
+        examples = []
+        for i, fileid in tqdm(enumerate([filename.replace('.txt', '') for filename in os.listdir(path) if filename.endswith('.txt')])):
+            if i == 10:
+                break
+            token_sequence, label_sequence = file2sequences(path, fileid, tokenizer)
+            examples.append(torchtext.data.Example.fromlist([token_sequence, label_sequence],
+                                                            [('token', self.token_field), ('label', self.label_field)]))
+        super(TokenizeDataset, self).__init__(examples, [('token', self.token_field), ('label', self.label_field)], **kwargs)
 
 
 class ChemdnerSubwordDataset(torchtext.data.Dataset):
@@ -29,7 +43,7 @@ class ChemdnerSubwordDataset(torchtext.data.Dataset):
         for i, fileid in tqdm(enumerate([filename.replace('.txt', '') for filename in os.listdir(path) if filename.endswith('.txt')])):
             if i == 10:
                 break
-            char_sequence, label_sequence = file2sequences(path, fileid)
+            char_sequence, label_sequence = file2char_level_sequences(path, fileid)
             subword_sequences = [char2token(char_sequence, tokenizer, tokenized_padding="copy") for tokenizer in subword_tokenizers.values()]
             examples.append(torchtext.data.Example.fromlist([char_sequence] + subword_sequences + [label_sequence], self.fields))
         super(ChemdnerSubwordDataset, self).__init__(examples, self.fields, **kwargs)

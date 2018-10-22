@@ -11,51 +11,7 @@ from tqdm import tqdm
 from labels import COMMA
 import argparse
 from utils import get_variable, tokens_batch2subwords
-
-
-def evaluate(dataset, model, batch_size, text_field, label_field, id2label, id2char, verbose=1, use_gpu=True, use_eval_batch_len=-1):
-    all_true_labels = []
-    all_pred_labels = []
-    precisions, recalls, fscores = [], [], []
-    model.eval()
-    eval_iter = Iterator(dataset, batch_size=batch_size, shuffle=False, repeat=False)
-    eval_iter.create_batches()
-
-    for batch_i, batch in tqdm(enumerate(eval_iter.batches)):
-        tokens = [b.text for b in batch]
-        texts = text_field.process([b.text for b in batch], device=-1, train=False)
-        labels = label_field.process([b.label for b in batch], device=-1, train=False)
-        true_labels = [[id2label[label_id] for label_id in batch] for batch in labels.transpose(1, 0)]
-        ###### LSTM CRF ########
-        subwords = tokens_batch2subwords(tokens, id2char=id2char, tokenize=lambda x: list(x))
-        input_tensor = get_variable(texts, use_gpu=use_gpu)
-        subwords_tensor = get_variable(subwords, use_gpu=use_gpu)
-        label_ids = model(input_tensor, subwords_tensor)
-        pred_labels = [[id2label[int(label_id)] for label_id in batch] for batch in label_ids]
-
-        ###### CHEM以外のラベルを削除。
-        true_entities = [true_entity for true_entity in get_entities(true_labels) if true_entity[0] == "CHEM"]
-        pred_entities = [pred_entity for pred_entity in get_entities(pred_labels) if pred_entity[0] == "CHEM"]
-        
-        TP = 0
-        pred_num = len(pred_entities)
-        true_num = len(true_entities)
-        for i, true_entity  in enumerate(true_entities):
-            for j, pred_entity in enumerate(pred_entities):
-                if true_entity == pred_entity:
-                    TP += 1
-        p = TP / pred_num if pred_num > 0 else 0
-        r = TP / true_num if true_num > 0 else 0
-        f = 2 * p * r / (p + r) if p + r > 0 else 0
-        precisions.append(p)
-        recalls.append(r)
-        fscores.append(f)
-        print("true_num: {}, pred_num: {}, TP: {}, precision: {}, recall: {}, fscore: {}".format(true_num, pred_num, TP, p, r, f))
-    precision = sum(precisions) / len(precisions)
-    recall = sum(recalls) / len(recalls)
-    fscore = sum(fscores) / len(fscores)
-
-    return precision, recall, fscore
+from evaluate_by_tokenizer import evaluate
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='deep image inpainting')
