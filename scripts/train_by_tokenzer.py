@@ -78,6 +78,8 @@ if __name__ == '__main__':
 
     ############ pretrain ###############
     for epoch in range(1, opt.lm_epoch + 1):
+        forward_losses = 0
+        backward_losses = 0
         for batch_i, batch in tqdm(enumerate(train_iter)):
             x = get_variable(batch.token, use_gpu=opt.gpu)
             reverse_x = torch.from_numpy(np.flip(batch.token.numpy(), axis=0).copy())
@@ -85,14 +87,14 @@ if __name__ == '__main__':
             next_x = batch.token[1:, :]
             pad = torch.full((1, next_x.shape[1]), train_dataset.token_field.vocab.itos.index('<pad>'), dtype=torch.long)
             next_x = torch.cat((next_x, pad))
-            output = forward_lm_model(batch.token)
-            target = forward_lm_model.embedding(next_x)
+            output = forward_lm_model(get_variable(batch.token, use_gpu=opt.gpu))
+            target = forward_lm_model.embedding(get_variable(next_x, use_gpu=opt.gpu))
             target.detach_()
             target = target.view(-1, opt.embed_dim).float()
             output = output.view(-1, opt.embed_dim).float()
-            loss = criterion_lm(output, target)
+            loss = criterion_lm(output, target) / batch.token.size(0)
             loss.backward()
-            print("\nforward LM loss: {}".format(loss))
+            forward_losses += float(loss)
             optimizer_forward_lm.step()
             # backward lm
             next_reverse_x = reverse_x[1:, :]
@@ -100,15 +102,18 @@ if __name__ == '__main__':
             next_reverse_x = torch.cat((next_reverse_x, pad))
             backward_lm_model.embedding.weight = forward_lm_model.embedding.weight
             backward_lm_model.decode.weight = forward_lm_model.decode.weight
-            output = backward_lm_model(batch.token)
-            target = backward_lm_model.embedding(next_x)
+            output = backward_lm_model(get_variable(batch.token, use_gpu=opt.gpu))
+            target = backward_lm_model.embedding(get_variable(next_x, use_gpu=opt.gpu))
             target.detach_()
             target = target.view(-1, opt.embed_dim).float()
             output = output.view(-1, opt.embed_dim).float()
-            loss = criterion_lm(output, target)
-            print("backward LM loss: {}".format(loss))
+            loss = criterion_lm(output, target) / batch.token.size(0)
             loss.backward()
+            backward_losses += float(loss)
             optimizer_backward_lm.step()
+
+        print("\nforward LM loss: {}".format(forward_losses))
+        print("backward LM loss: {}".format(backward_losses))
 
     ############ transport pretrained layers ###############
     model.embedding = backward_lm_model.embedding

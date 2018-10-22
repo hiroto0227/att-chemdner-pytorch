@@ -25,4 +25,4 @@ class Word2Vec(nn.Module):
         embed = self.embedding(x)
         lstm_out, self.hidden = self.lstm(embed)
         decoded = self.decode(lstm_out)
-        return F.log_softmax(decoded)
+        return decoded
