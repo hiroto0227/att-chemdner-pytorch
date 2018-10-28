@@ -149,7 +149,12 @@ def char2token(char_sequence, tokenizer, tokenized_padding="copy"):
 
 def tokenize(text):
     """textをtoken単位に分割したリストを返す。"""
-    tokens = re.split("""( | |\xa0|\t|\n|…|\'|\"|·|~|↔|•|\!|@|#|\$|%|\^|&|\*|-|=|_|\+|ˉ|\(|\)|\[|\]|\{|\}|;|‘|:|“|,|\.|\/|<|>|×|>|<|≤|≥|↑|↓|→|¬|®|•|′|°|~|≈|\?|Δ|÷|≠|‘|’|“|”|§|£|€|0|1|2|3|4|5|6|7|8|9|™|⋅|-|\u2000|⁺|\u2009|)""", text)
+    tokens = re.split("( | |\xa0|\t|\n|…|\'|\"|·|~|↔|•|\!|@|#|\$|%|\^|&|\*|-|=|_|\+|ˉ|\(|\)|\[|\]|\{|\}|;|‘|:|“|,|\.|\/|<|>|×|>|<|≤|≥|↑|↓|→|¬|®|•|′|°|~|≈|\?|Δ|÷|≠|‘|’|“|”|§|£|€|0|1|2|3|4|5|6|7|8|9|™|⋅|-|\u2000|⁺|\u2009)", text)
+    return list(filter(None, tokens))
+
+def tokenize_char(text):
+    """textをtoken単位に分割したリストを返す。"""
+    tokens = re.split("(|)", text)
     return list(filter(None, tokens))
 
 

@@ -13,7 +13,7 @@ class TokenizeDataset(torchtext.data.Dataset):
         self.label_field = Field(sequential=True, use_vocab=True)
         examples = []
         for i, fileid in tqdm(enumerate([filename.replace('.txt', '') for filename in os.listdir(path) if filename.endswith('.txt')])):
-            #if i == 10:
+            #if i == 200:
             #    break
             token_sequence, label_sequence = file2sequences(path, fileid, tokenizer)
             examples.append(torchtext.data.Example.fromlist([token_sequence, label_sequence],
