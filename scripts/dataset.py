@@ -1,7 +1,7 @@
 import os
 import torch
 import torchtext
-from torchtext.data import ReversibleField, Field
+from torchtext.data import Field
 from tqdm import tqdm
 from labels import PAD, UNK, COMMA, NEWLINE
 from datautils import char2token, file2sequences, file2char_level_sequences
@@ -9,12 +9,12 @@ from datautils import char2token, file2sequences, file2char_level_sequences
 
 class TokenizeDataset(torchtext.data.Dataset):
     def __init__(self, path, tokenizer, **kwargs):
-        self.token_field = ReversibleField(sequential=True, tensor_type=torch.LongTensor, use_vocab=True)
-        self.label_field = ReversibleField(sequential=True, use_vocab=True)
+        self.token_field = Field(sequential=True, tensor_type=torch.LongTensor, use_vocab=True)
+        self.label_field = Field(sequential=True, use_vocab=True)
         examples = []
         for i, fileid in tqdm(enumerate([filename.replace('.txt', '') for filename in os.listdir(path) if filename.endswith('.txt')])):
-            if i == 10:
-                break
+            #if i == 200:
+            #    break
             token_sequence, label_sequence = file2sequences(path, fileid, tokenizer)
             examples.append(torchtext.data.Example.fromlist([token_sequence, label_sequence],
                                                             [('token', self.token_field), ('label', self.label_field)]))

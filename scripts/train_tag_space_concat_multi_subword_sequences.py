@@ -74,7 +74,7 @@ if __name__ == '__main__':
                 model.zero_grad()
                 model.train()
                 loss = model.loss(x_char, x_subs, y) / x_char.size(0)
-                print('loss: {}'.format(float(loss)))
+                #print('loss: {}'.format(float(loss)))
                 loss.backward()
                 optimizer.step()
                 loss_per_epoch += float(loss)
@@ -84,16 +84,16 @@ if __name__ == '__main__':
                 df_epoch_results.to_csv(os.path.join(RESULT_PATH, 'result_epoch_{}.csv'.format(MODEL_PATH.split('/')[-1])), float_format='%.3f')
                 traceback.print_exc()
                 sys.exit(1)
-
-        precision, recall, f1_score = evaluate(dataset=valid_dataset,
-                                               model=model,
-                                               batch_size=opt.batch_size,
-                                               train_fields=train_dataset.fields,
-                                               subword_tokenizers=subword_tokenizers,
-                                               verbose=0,
-                                               use_gpu=opt.gpu)
-        if early_stopping.is_end(f1_score):
-            break
+        if epoch % 5 == 1:
+            precision, recall, f1_score = evaluate(dataset=valid_dataset,
+                                                   model=model,
+                                                   batch_size=opt.batch_size,
+                                                   train_fields=train_dataset.fields,
+                                                   subword_tokenizers=subword_tokenizers,
+                                                   verbose=0,
+                                                   use_gpu=opt.gpu)
+            if early_stopping.is_end(f1_score):
+                break
 
         df_epoch_results = df_epoch_results.append(pd.Series({'epoch': epoch,
                                                               'loss': loss_per_epoch,
