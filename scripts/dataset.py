@@ -1,95 +1,83 @@
 import os
-import torch
-import torchtext
-from torchtext.data import Field
 from tqdm import tqdm
-from labels import PAD, UNK, COMMA, NEWLINE
-from datautils import char2token, file2sequences, file2char_level_sequences
+import labels
+from chemdnerdatautils import file2sequences
 
 
-class TokenizeDataset(torchtext.data.Dataset):
-    def __init__(self, path, tokenizer, **kwargs):
-        self.token_field = Field(sequential=True, tensor_type=torch.LongTensor, use_vocab=True)
-        self.label_field = Field(sequential=True, use_vocab=True)
-        examples = []
-        for i, fileid in tqdm(enumerate([filename.replace('.txt', '') for filename in os.listdir(path) if filename.endswith('.txt')])):
-            #if i == 200:
-            #    break
-            token_sequence, label_sequence = file2sequences(path, fileid, tokenizer)
-            examples.append(torchtext.data.Example.fromlist([token_sequence, label_sequence],
-                                                            [('token', self.token_field), ('label', self.label_field)]))
-        super(TokenizeDataset, self).__init__(examples, [('token', self.token_field), ('label', self.label_field)], **kwargs)
+def load_sequences(path, tokenizer):
+    token_seqs = []
+    label_seqs = []
+    fileids = [filename.replace('.txt', '') for filename in os.listdir(path) if filename.endswith('.txt')]
+    for i, fileid in tqdm(enumerate(fileids)):
+        if i == 50:
+            break
+        token_seq, label_seq = file2sequences(path, fileid, tokenizer)
+        token_seqs.append(token_seq)
+        label_seqs.append(label_seq)
+    return token_seqs, label_seqs
 
 
-class ChemdnerSubwordDataset(torchtext.data.Dataset):
-    def __init__(self, path, subword_tokenizers={}, fields=None, tokenized_padding="copy", **kwargs):
-        """LabelはCharacter Baseで分割し、tokenizerによって分かれたtokenを積み上げていく。
-        input:
-            subword_tokenizers: 複数のtokenizerを使用する。
-            tokenized_padding: "copy" or "zero"
-                tokenizeでcharをまとめ上げた時に、最後のtoken以外のtokenを複製するか否か。
-                copyの場合の例:
-                    "A" "u" "t"  "o" "m"  "a"  "t"  "i"  "c"
-                    -> "Auto" "Auto" "Auto" "Auto" "ma" "ma" "tic" "tic" "tic"
-        """
-        if fields:
-            self.fields = fields
+def to_id(seqs, dic, char=False, label=False):
+    id_seqs = []
+    for seq in seqs:
+        if char:
+            id_seqs.append([[dic.get(u, dic[labels.UNK]) for u in unit] for unit in seq])
+        elif label:
+            id_seqs.append([dic.get(unit) for unit in seq])
         else:
-            self.fields = [('char', Field(sequential=True, tensor_type=torch.LongTensor, use_vocab=True))]
-            for name in subword_tokenizers.keys():
-                self.fields.append((name, Field(sequential=True, tensor_type=torch.LongTensor, use_vocab=True)))
-            self.fields.append(('label', Field(sequential=True)))
-        examples = []
-        for i, fileid in tqdm(enumerate([filename.replace('.txt', '') for filename in os.listdir(path) if filename.endswith('.txt')])):
-            if i == 10:
-                break
-            char_sequence, label_sequence = file2char_level_sequences(path, fileid)
-            subword_sequences = [char2token(char_sequence, tokenizer, tokenized_padding="copy") for tokenizer in subword_tokenizers.values()]
-            examples.append(torchtext.data.Example.fromlist([char_sequence] + subword_sequences + [label_sequence], self.fields))
-        super(ChemdnerSubwordDataset, self).__init__(examples, self.fields, **kwargs)
-
-    def make_vocab(self, load_vector_field_names=[]):
-        for field_name, field in self.fields.items():
-            field.build_vocab(self)
-            if field_name in load_vector_field_names:
-                self.text_field.vocab.load_vectors("fasttext.simple.300d")
+            id_seqs.append([dic.get(unit, dic[labels.UNK]) for unit in seq])
+    return id_seqs
 
 
-class ChemdnerDataset(torchtext.data.Dataset):
-    """Chemdnerのデータセット
-    how to use:
-        train_dataset = ChemdnerDataset('./datas/processed/train.csv')
-        train_iter = data.Iterator(dataset=train, batch_size=32, shuffle=False, repeat=False)
-    """
+def batch_gen(token_id_seqs, char_id_seqs, label_id_seqs, batch_size, word_pad_ix, char_pad_ix, label_pad_ix, shuffle=False):
+    if shuffle:
+        pass
+    token_batches, char_batches, label_batches = [], [], []
+    max_len = 0
+    char_max_len = 0
+    for i, (token_id_seq, char_id_seq, label_id_seq) in enumerate(zip(token_id_seqs, char_id_seqs, label_id_seqs)):
+        if max_len < len(token_id_seq):
+            max_len = len(token_id_seq)
+        if char_max_len < max([len(token_ids) for token_ids in char_id_seq]):
+            char_max_len = max([len(token_ids) for token_ids in char_id_seq])
+        token_batches.append(token_id_seq)
+        char_batches.append(char_id_seq)
+        label_batches.append(label_id_seq)
+        if (i + 1) % batch_size == 0:
+            #yield (padding(token_batches, max_len, word_pad_ix),
+            #       padding(char_batches, max_len, char_pad_ix, char_level_pad=True),
+            #       padding(label_batches, max_len, label_pad_ix))
+            yield (padding(token_batches, max_len, word_pad_ix),
+                   padding(char_batches, max_len, char_pad_ix, char_level_pad=True,  char_max_len=char_max_len),
+                   padding(label_batches, max_len, label_pad_ix))
+            token_batches, char_batches, label_batches = [], [], []
 
-    def __init__(self, path, fields=None, **kwargs):
-        if not fields:
-            self.text_field = Field(sequential=True, tensor_type=torch.LongTensor, use_vocab=True)
-            self.label_field = Field(sequential=True)
-            fields = [('text', self.text_field), ('label', self.label_field)]
 
-        examples = []
-        with open(path) as f:
-            rows = f.read().split('\n')
-            for i, row in enumerate(rows):
-                #if i == 500:
-                #    break
-                splitted_row = row.split(',')
-                length = len(splitted_row) // 2
-                tokens, labels = splitted_row[:length], splitted_row[length:]
-                examples.append(torchtext.data.Example.fromlist([tokens, labels], fields))
-        super(ChemdnerDataset, self).__init__(examples, fields, **kwargs)
+def padding(batches, max_len, pad_ix, char_level_pad=False, char_max_len=None):
+    pad_batches = []
+    for batch in batches:
+        pad_length = max_len - len(batch)
+        if char_max_len:
+            padded_char_batch = []
+            for b in batch:
+                char_pad_length = char_max_len - len(b)
+                padded_char_batch.append(b + [pad_ix for i in range(char_pad_length)])
+            pad_batch = [[pad_ix for i in range(char_max_len)] for j in range(pad_length)]
+            pad_batches.append(padded_char_batch + pad_batch)
+        else:
+            if char_level_pad:
+                pad_batches.append(batch + [[pad_ix] for i in range(pad_length)])
+            else:
+                pad_batches.append(batch + [pad_ix for i in range(pad_length)])
+    return pad_batches
 
-    def make_vocab(self):
-        self.text_field.build_vocab(self)
-        self.label_field.build_vocab(self)
-        self.text_field.vocab.load_vectors("fasttext.simple.300d")
-        return self.text_field.vocab.stoi, self.label_field.vocab.stoi
 
-    def get_id2token(self, tokenize=list):
-        id2token = [PAD, UNK, COMMA, '<pad>', NEWLINE]
-        for example in self.examples:
-            for token in list(''.join(example.text)):
-                if not token in id2token:
-                    id2token.append(token)
-        return id2token
+def make_vocab(token_seqs):
+    tokenset = set([token for seq in token_seqs for token in seq])
+    token2id = {labels.UNK: 0, labels.PAD: 1}
+    token2id.update({token: i + 2 for i, token in enumerate(sorted(tokenset))})
+    charset = set([char for chars in tokenset for char in chars])
+    char2id = {labels.UNK: 0, labels.PAD: 1}
+    char2id.update({token: i + 2 for i, token in enumerate(sorted(charset))})
+    print("token vocab dim: {}, char vocab dim: {}".format(len(token2id), len(char2id)))
+    return token2id, char2id

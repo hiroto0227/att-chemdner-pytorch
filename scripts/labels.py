@@ -1,7 +1,7 @@
 B = 'B-CHEM'
 I = 'I-CHEM'
-E = 'E-CHEM'
-S = 'S-CHEM'
+E = 'I-CHEM'
+S = 'B-CHEM'
 O = 'O'
 
 PAD = '<PAD>'

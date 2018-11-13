@@ -1,123 +1,81 @@
 import argparse
-import os, sys
-import traceback
-import numpy as np
-from datetime import datetime
+import torch
+import os
 from tqdm import tqdm
 import time
-import torch
-from torch.nn.utils.rnn import pack_sequence, pad_sequence
-import torchtext
-from torchtext.data import BucketIterator, Iterator
 from torch import optim
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.autograd import Variable
-from dataset import ChemdnerDataset
-from model.lstm_crf import LSTMCRFTagger
-from model.attention_lstm import Att_LSTM
-from evaluate import evaluate
+import dataset
+from model.bilstmlstmcrf import BiLSTMLSTMCRF
 import pandas as pd
-from utils import EarlyStop, get_variable, checkpoint, make_subwords_from_token_batches
+from chemdnerdatautils import tokenize
+from utils import checkpoint, get_variable
+import pretrain
+import labels
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='deep image inpainting')
-    parser.add_argument('--batch_size', type=int, default=50, help='training batch size')
+    parser.add_argument('--batch-size', '-bs', type=int, default=100, help='training batch size')
     parser.add_argument('--epoch', type=int, default=1, help='training epoch')
-    parser.add_argument('--embed_dim', type=int, default=300, help='embedding dim')
-    parser.add_argument('--hidden_dim', type=int, default=1000, help='hidden dim')
-    parser.add_argument('--num_layers', type=int, default=1, help='num layers')
-    parser.add_argument('--early_stop', action='store_true')
+    parser.add_argument('--word-embed', type=int, default=100)
+    parser.add_argument('--char-embed', type=int, default=30)
+    parser.add_argument('--word-lstm', type=int, default=200)
+    parser.add_argument('--char-lstm', type=int, default=50)
+    parser.add_argument('--dropout', type=float, default=0.5)
+    parser.add_argument('--learning-rate', type=float, default=0.001)
+    parser.add_argument('--weight-decay', type=float, default=1e-8)
+    parser.add_argument('--word2vec-path', type=str, default=None, help='pretrained word2vec path')
+    parser.add_argument('--model-path', type=str, default='./chemdner.pth', help='path to save model')
     parser.add_argument('--gpu', action='store_true')
     opt = parser.parse_args()
-    
     CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-    MODEL_PATH = os.path.join(CURRENT_DIR, '../models/', 'bilstm_crf_{}_{}bs'.format(datetime.now().strftime("%m%d%H%M"), opt.batch_size))
-    RESULT_PATH = os.path.join(CURRENT_DIR, '../results/')
 
     ########### data load #################
-    train_dataset = ChemdnerDataset(path=os.path.join(CURRENT_DIR, '../datas/processed/train.csv'))
-    token2id, label2id = train_dataset.make_vocab()
-    id2token, id2label = [k for k, v in token2id.items()], [k for k, v in label2id.items()]
-    id2char = train_dataset.get_id2token(tokenize=str.split)
-    valid_dataset = ChemdnerDataset(path=os.path.join(CURRENT_DIR, '../datas/processed/valid.csv'))
+    token_seqs, label_seqs = dataset.load_sequences(os.path.join(CURRENT_DIR, '../datas/raw/train'), tokenize)
+    char_seqs = [[[c for c in token] for token in token_seq] for token_seq in token_seqs]
+    token2id, char2id = dataset.make_vocab(token_seqs)
+    label2id = {labels.O: 0, labels.B: 1, labels.I: 2}
+    token_id_seqs = dataset.to_id(token_seqs, token2id)
+    char_id_seqs = dataset.to_id(char_seqs, char2id, char=True)
+    label_id_seqs = dataset.to_id(label_seqs, label2id, label=True)
 
-    model = LSTMCRFTagger(vocab_dim=len(token2id),
-                          tag_dim=len(label2id),
+    ######### load pretrain embedding ################
+    word2vec = pretrain.load_word2vec(opt.word2vec_path)
+    pretrain_embed = pretrain.make_pretrain_embed(word2vec, token2id)
+
+    ########## model init ##################
+    model = BiLSTMLSTMCRF(word_vocab_dim=len(token2id),
+                          char_vocab_dim=len(char2id),
+                          label_dim=len(label2id),
+                          word_embed_dim=opt.word_embed,
+                          char_embed_dim=opt.char_embed,
+                          word_lstm_dim=opt.word_lstm,
+                          char_lstm_dim=opt.char_lstm,
                           batch_size=opt.batch_size,
-                          embed_dim=opt.embed_dim,
-                          hidden_dim=opt.hidden_dim,
-                          num_layers=opt.num_layers,
-                          use_gpu=opt.gpu,
-                          alphabet_size=len(id2char))
+                          pretrain_embed=pretrain_embed,
+                          training=True,
+                          use_gpu=opt.gpu)
+    optimizer = optim.SGD(model.parameters(), lr=opt.learning_rate, weight_decay=opt.weight_decay)
 
-    print(model)
-    if opt.gpu and torch.cuda.is_available():
-        print('\n=============== use GPU =================\n')
-        model.cuda()
-    optimizer = optim.SGD(model.parameters(), lr=0.1, weight_decay=0)
-
-    train_iter = BucketIterator(train_dataset, batch_size=opt.batch_size, shuffle=True, repeat=False, device=-1)
+    ############# train parameter init #####################
     df_epoch_results = pd.DataFrame(columns=['epoch', 'loss', 'valid_precision', 'valid_recall', 'valid_fscore', 'time'])
-    early_stopping = EarlyStop(stop_not_rise_num=7, threshold_rate=0.01)
     precision, recall, f1_score = (0, 0, 0)
 
     ############ start training ################
     for epoch in range(1, opt.epoch + 1):
         start = time.time()
         loss_per_epoch = 0
-        for batch_i, batch in tqdm(enumerate(train_iter)):
-            try:
-                batch_start = time.time()
-                subwords = make_subwords_from_token_batches(batch.text, id2token=id2token, id2char=id2char, tokenize=lambda x: list(x)) # (batch_size, seq_length, subword_length)
-                
-                subwords_tensor = get_variable(subwords, use_gpu=opt.gpu)
-                input_tensor = get_variable(batch.text, use_gpu=opt.gpu)
-                target_tensor = get_variable(batch.label, use_gpu=opt.gpu)
-                model.zero_grad()
-                model.train()
-                
-                ###### LSTM ##########
-                #output = model(input_tensor) # (seq_length, batch_size, tag_size)
-                #loss = F.nll_loss(output.view(-1, len(label2id)), output_tensor.view(-1).cpu())
-                ###### LStm ##########
+        for i, (token_batch, char_batch, label_batch) in tqdm(enumerate(dataset.batch_gen(token_id_seqs, char_id_seqs, label_id_seqs, opt.batch_size, token2id[labels.UNK], char2id[labels.UNK], label2id[labels.O], shuffle=True))):
+            batch_start = time.time()
+            model.zero_grad()
+            model.train()
+            token_batch = get_variable(torch.LongTensor(token_batch), use_gpu=opt.gpu).transpose(1, 0)
+            char_batch = get_variable(torch.LongTensor(char_batch), use_gpu=opt.gpu).transpose(1, 0)
+            label_batch = get_variable(torch.LongTensor(label_batch), use_gpu=opt.gpu).transpose(1, 0)
+            loss = model.loss(token_batch, char_batch, label_batch)
+            loss.backward()
+            optimizer.step()
+            loss_per_epoch += float(loss)
 
-                ####### BiLSTM CRF ########
-                loss = model.loss(input_tensor, subwords_tensor, target_tensor) / input_tensor.size(0)
-                ####### BiLSTM CRF ########
-                # print('loss: {}'.format(float(loss)))
-                loss.backward()
-                optimizer.step()
-                loss_per_epoch += float(loss)
-
-            except:
-                checkpoint(epoch, model, MODEL_PATH, opt.batch_size, interrupted=True, use_gpu=opt.gpu)
-                df_epoch_results.to_csv(os.path.join(RESULT_PATH, 'result_epoch_{}.csv'.format(MODEL_PATH.split('/')[-1])), float_format='%.3f')
-                traceback.print_exc()
-                sys.exit(1)
-
-        if epoch % 5 == 1:
-            precision, recall, f1_score = evaluate(dataset=valid_dataset, 
-                                                   model=model,
-                                                   batch_size=opt.batch_size,
-                                                   text_field=train_dataset.text_field,
-                                                   label_field=train_dataset.label_field,
-                                                   id2label=id2label,
-                                                   id2char=id2char,
-                                                   verbose=0,
-                                                   use_gpu=opt.gpu)
-            if early_stopping.is_end(f1_score):
-                break
-
-        df_epoch_results = df_epoch_results.append(pd.Series({'epoch': epoch,
-                           'loss': loss_per_epoch,
-                           'valid_precision': precision,
-                           'valid_recall': recall,
-                           'valid_fscore': f1_score,
-                           'time': time.time() - start}), ignore_index=True)
-
-        print('{}epoch\nloss: {}\nvalid: {}\ntime: {} sec.\n'.format(epoch, loss_per_epoch, f1_score, time.time() - start))
-    
-    checkpoint(epoch, model, MODEL_PATH, batch_size=opt.batch_size, use_gpu=opt.gpu)
-    df_epoch_results.to_csv(os.path.join(RESULT_PATH, 'result_epoch_{}.csv'.format(MODEL_PATH.split('/')[-1])), float_format='%.3f')
+        print('{}epoch\nloss: {}\nvalid: {}\ntime: {} sec.\n'.format(epoch, loss_per_epoch, 0, time.time() - start))
+    checkpoint(model, opt.model_path)

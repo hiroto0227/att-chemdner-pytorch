@@ -14,13 +14,9 @@ def get_variable(tensor, use_gpu=False, **kwargs):
     return result
 
 
-def checkpoint(epoch, model, model_path, batch_size, interrupted=False, use_gpu=False):
-    print('\nmodel saved!!')
-    gpu_flag = 'gpu' if use_gpu and torch.cuda.is_available() else 'cpu'
-    interrupted_flag = 'interrupted' if interrupted else ''
-    model_dir, model_name = os.path.split(model_path)
-    model_name = '{}_{}_{}ep_{}bs_{}.pth'.format(gpu_flag, model_name, epoch, batch_size, interrupted_flag)
-    torch.save(model.state_dict(), os.path.join(model_dir, model_name))
+def checkpoint(model, model_path):
+    print('\nmodel saved: {}'.format(model_path))
+    torch.save(model.state_dict(), model_path)
 
 
 def make_subwords_from_token_batches(token_batch, id2token, id2char, tokenize, max_length=40):
