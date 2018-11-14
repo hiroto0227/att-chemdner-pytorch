@@ -9,8 +9,6 @@ def load_sequences(path, tokenizer):
     label_seqs = []
     fileids = [filename.replace('.txt', '') for filename in os.listdir(path) if filename.endswith('.txt')]
     for i, fileid in tqdm(enumerate(fileids)):
-        if i == 50:
-            break
         token_seq, label_seq = file2sequences(path, fileid, tokenizer)
         token_seqs.append(token_seq)
         label_seqs.append(label_seq)
@@ -48,7 +46,7 @@ def batch_gen(token_id_seqs, char_id_seqs, label_id_seqs, batch_size, word_pad_i
             #       padding(char_batches, max_len, char_pad_ix, char_level_pad=True),
             #       padding(label_batches, max_len, label_pad_ix))
             yield (padding(token_batches, max_len, word_pad_ix),
-                   padding(char_batches, max_len, char_pad_ix, char_level_pad=True,  char_max_len=char_max_len),
+                   padding(char_batches, max_len, char_pad_ix, char_max_len=char_max_len),
                    padding(label_batches, max_len, label_pad_ix))
             token_batches, char_batches, label_batches = [], [], []
 
@@ -65,10 +63,7 @@ def padding(batches, max_len, pad_ix, char_level_pad=False, char_max_len=None):
             pad_batch = [[pad_ix for i in range(char_max_len)] for j in range(pad_length)]
             pad_batches.append(padded_char_batch + pad_batch)
         else:
-            if char_level_pad:
-                pad_batches.append(batch + [[pad_ix] for i in range(pad_length)])
-            else:
-                pad_batches.append(batch + [pad_ix for i in range(pad_length)])
+            pad_batches.append(batch + [pad_ix for i in range(pad_length)])
     return pad_batches
 
 

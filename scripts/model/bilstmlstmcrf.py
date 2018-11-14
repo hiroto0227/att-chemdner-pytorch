@@ -18,6 +18,11 @@ class CharLSTM(nn.Module):
         self.char_lstm_f = nn.LSTM(char_embed_dim, char_lstm_dim)
         self.char_lstm_b = nn.LSTM(char_embed_dim, char_lstm_dim)
 
+        if use_gpu:
+            self.char_embed.cuda()
+            self.char_lstm_f.cuda()
+            self.char_lstm_b.cuda()
+
     def init_char_lstm_hidden(self, char_size):
         return (get_variable(torch.zeros(1, char_size, self.char_lstm_dim), use_gpu=self.use_gpu),
                 get_variable(torch.zeros(1, char_size, self.char_lstm_dim), use_gpu=self.use_gpu))
@@ -26,7 +31,7 @@ class CharLSTM(nn.Module):
         char_lstm_outs = []
         seq_len, batch_size, max_char_len = char_id_seq.shape
         for char_ids in char_id_seq:
-            char_ids_b = torch.from_numpy(np.flip(char_ids, 1).copy())
+            char_ids_b = get_variable(torch.from_numpy(np.flip(char_ids, 1).copy()), use_gpu=self.use_gpu)
             self.char_lstm_hidden_f = self.init_char_lstm_hidden(max_char_len)
             self.char_lstm_hidden_b = self.init_char_lstm_hidden(max_char_len)
             embed_f = self.char_embed(char_ids)  # (bs, max_char_len, char_embed_dim)
@@ -50,13 +55,19 @@ class BiLSTMLSTMCRF(nn.Module):
         self.char_tanh_dim = char_tanh_dim
 
         self.char_lstm = CharLSTM(char_vocab_dim, char_embed_dim, char_lstm_dim, use_gpu=use_gpu)
-        self.word_embed = nn.Embedding(word_vocab_dim, word_embed_dim)
+        self.word_embed = nn.Embedding(word_vocab_dim, word_embed_dim, )
         if pretrain_embed is not None:
             pass
             #self.word_embed.weight.data.copy_(torch.from_numpy(pretrain_embed))
         self.word_lstm = nn.LSTM(word_embed_dim + char_lstm_dim * 2, word_lstm_dim, bidirectional=True)
         self.tanh = nn.Linear(word_lstm_dim * 2, label_dim)
         self.crf = CRF(label_dim)
+
+        if use_gpu:
+            self.word_embed.cuda()
+            self.word_lstm.cuda()
+            self.tanh.cuda()
+            self.crf.cuda()
 
     def init_word_hidden(self):
         return (get_variable(torch.zeros(2, self.batch_size, self.word_lstm_dim), use_gpu=self.use_gpu),

@@ -1,7 +1,7 @@
 import os
 import re
 from seqeval.metrics.sequence_labeling import get_entities
-from labels import O, S, B, I, E
+from labels import O, B, I
 
 ok = 0
 fail = 0
@@ -24,14 +24,12 @@ def file2sequences(path, fileid, tokenizer):
         #print(text_spantokens)
         #print('--------------------------')
         #print(label_sequence)
-        #print('--------------------------')
+        #print('---------- true ----------------')
         #print(ann_spantokens)
-        #print('--------------------------')
+        #print('----------- pred ---------------')
         #print(pred_spantokens)
         fail += len(set(ann_spantokens) - set(pred_spantokens))
         ok -= len(set(ann_spantokens) - set(pred_spantokens))
-        pass
-        #print(ok)
         print("labelize fail num: {}".format(fail))
     else:
         #print('================================')
@@ -46,44 +44,27 @@ def file2sequences(path, fileid, tokenizer):
 def make_tokens_and_labels(text_spantokens, ann_spantokens):
     tokens, labels = [], []
     ann_idx = 0
-    for spantoken in text_spantokens:
+    pre_label = O
+    for token, start, end in text_spantokens:
         if ann_idx >= len(ann_spantokens):
-            tokens.append(spantoken[0])
+            tokens.append(token)
             labels.append(O)
-        elif (spantoken[1] == ann_spantokens[ann_idx][1] and spantoken[2] == ann_spantokens[ann_idx][2]):
-            ann_idx += 1
-            tokens.append(spantoken[0])
-            labels.append(S)
-        elif spantoken[1] == ann_spantokens[ann_idx][1]:
-            tokens.append(spantoken[0])
+        elif start == ann_spantokens[ann_idx][1]:
+            tokens.append(token)
             labels.append(B)
-        elif spantoken[2] == ann_spantokens[ann_idx][2]:
-            ann_idx += 1
-            tokens.append(spantoken[0])
-            labels.append(E)
-        elif spantoken[1] > ann_spantokens[ann_idx][1] and spantoken[2] < ann_spantokens[ann_idx][2]:
-            if labels[-1] == O:
-                tokens.append(spantoken[0])
-                labels.append(B)
-            else:
-                tokens.append(spantoken[0])
-                labels.append(I)
+        elif pre_label in [B, I] and end <= ann_spantokens[ann_idx][2]:
+            tokens.append(token)
+            labels.append(I)
         else:
-            # tokenizerによりラベルがうまく分割されなかった時。
-            if spantoken[1] <= ann_spantokens[ann_idx][1] and spantoken[2] >= ann_spantokens[ann_idx][2]:
+            tokens.append(token)
+            labels.append(O)
+            if pre_label in [B, I]:
                 ann_idx += 1
-                tokens.append(spantoken[0])
-                labels.append(S)
-            elif len(labels) > 0 and labels[-1] in [B, I]:
-                ann_idx += 1
-                tokens.append(spantoken[0])
-                labels.append(E)
-            else:
-                if spantoken[1] > ann_spantokens[ann_idx][2]:
-                    ann_idx += 1
-                tokens.append(spantoken[0])
-                labels.append(O)
-    assert len(tokens) == len(labels), 'tokensとlabelsの値が違います。'
+        # ann_idxがずれた場合の対処
+        if ann_idx + 1 < len(ann_spantokens) and end > ann_spantokens[ann_idx + 1][1]:
+            ann_idx += 1
+            labels[-1] = B
+        pre_label = labels[-1]
     return tokens, labels
 
 
@@ -91,9 +72,11 @@ def text_to_spantokens(text, tokenizer):
     """textをtokenizeし、(token, start_ix, end_ix)のリストとして返す。"""
     spantokens = []
     ix = 0
+    end_ix = 1
     for token in tokenizer(text):
-        spantokens.append((token, ix, ix + len(token)))
+        spantokens.append((token, ix, end_ix + len(token) - 1))
         ix += len(token)
+        end_ix += len(token)
     return spantokens
 
 
@@ -113,26 +96,51 @@ def labels_to_anns(labels, text_spantokens):
     spantokens = set()
     entity = ''
     ann_start = 0
+    num_inconsistency = 0
     pre_label = O
-    for text_ann, label in zip(text_spantokens, labels):
-        pre_now = (pre_label, label)
+    for (token, start, end), now_label in zip(text_spantokens, labels):
+        if pre_label == O and now_label == I:
+            # ERROR
+            print("######### inconcictency!!! #########")
+            num_inconsistency += 1
+        elif pre_label in [B, I] and now_label == I:
+            # UPDATE
+            entity += token
+            ann_end = end
+        elif pre_label in [B, I] and now_label == B:
+            # APPEND NEW
+            spantokens.add((entity, ann_start, pre_end))
+            entity = token
+            ann_start = start
+        elif pre_label in [B, I] and now_label == O:
+            # APPEND
+            spantokens.add((entity, ann_start, pre_end))
+        elif pre_label == O and now_label == B:
+            # NEW
+            entity = token
+            ann_start = start
+        else:
+            pass
+
+        #pre_now = (pre_label, label)
         # あり得るラベル列の組み合わせ
-        if pre_now in [(B, I), (B, E), (I, E), (E, B), (E, S), (I, I),
-                       (S, B), (O, S), (O, B), (O, I), (O, E)]:
-            if label == S:
-                spantokens.add(text_ann)
-            elif label == B:
-                ann_start = text_ann[1]
-                entity += text_ann[0]
-            elif label == I:
-                entity += text_ann[0]
-            elif label == E:
-                entity += text_ann[0]
-                spantokens.add((entity, ann_start, text_ann[2]))
-                entity = ''
-            elif label == O:
-                entity += text_ann[0]
-        pre_label = label
+        #if pre_now in [(B, I), (B, E), (I, E), (E, B), (E, S), (I, I),
+        #               (S, B), (O, S), (O, B), (O, I), (O, E)]:
+        #    if label == S:
+        #        spantokens.add(text_ann)
+        #    elif label == B:
+        #        ann_start = text_ann[1]
+        #        entity += text_ann[0]
+        #    elif label == I:
+        #        entity += text_ann[0]
+        #    elif label == E:
+        #        entity += text_ann[0]
+        #        spantokens.add((entity, ann_start, text_ann[2]))
+        #        entity = ''
+        #    elif label == O:
+        #        entity += text_ann[0]
+        pre_label = now_label
+        pre_end = end
     return sorted(spantokens, key=lambda x: x[1])
 
 
@@ -151,12 +159,6 @@ def tokenize(text):
     """textをtoken単位に分割したリストを返す。"""
     tokens = re.split("( | |\xa0|\t|\n|…|\'|\"|·|~|↔|•|\!|@|#|\$|%|\^|&|\*|-|=|_|\+|ˉ|\(|\)|\[|\]|\{|\}|;|‘|:|“|,|\.|\/|<|>|×|>|<|≤|≥|↑|↓|→|¬|®|•|′|°|~|≈|\?|Δ|÷|≠|‘|’|“|”|§|£|€|0|1|2|3|4|5|6|7|8|9|™|⋅|-|\u2000|⁺|\u2009)", text)
     return list(filter(None, tokens))
-
-def tokenize_char(text):
-    """textをtoken単位に分割したリストを返す。"""
-    tokens = re.split("(|)", text)
-    return list(filter(None, tokens))
-
 
 def file2char_level_sequences(path, fileid):
     def annotation2entities(annotation):
