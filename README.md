@@ -12,5 +12,5 @@
 >>> python3.7 tokenize_for_pretrain.py --input-path ../../../PubMed/out.txt --sp-model ../sentencepieces/sp16000.model --output-path tokenized_out.txt
 
 # fasttextで学習する。
->>> fastText-0.1.0/fasttext skipgram -input ./tokenized_out.txt -output pretrain.model
+>>> ~/fastText-0.1.0/fasttext skipgram -input ./tokenized_out.txt -output pretrain.model -dim 50  -epoch 10
 ```
