@@ -57,8 +57,7 @@ class BiLSTMLSTMCRF(nn.Module):
         self.char_lstm = CharLSTM(char_vocab_dim, char_embed_dim, char_lstm_dim, use_gpu=use_gpu)
         self.word_embed = nn.Embedding(word_vocab_dim, word_embed_dim, )
         if pretrain_embed is not None:
-            pass
-            #self.word_embed.weight.data.copy_(torch.from_numpy(pretrain_embed))
+            self.word_embed.weight.data.copy_(torch.from_numpy(pretrain_embed))
         self.word_lstm = nn.LSTM(word_embed_dim + char_lstm_dim * 2, word_lstm_dim, bidirectional=True)
         self.tanh = nn.Linear(word_lstm_dim * 2, label_dim)
         self.crf = CRF(label_dim)
@@ -90,5 +89,6 @@ class BiLSTMLSTMCRF(nn.Module):
 
     def forward(self, word, char):
         out = self._forward(word, char)
+        print(out)
         decoded = torch.FloatTensor(self.crf.decode(out))
         return decoded

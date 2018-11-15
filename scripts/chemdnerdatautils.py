@@ -19,15 +19,17 @@ def file2sequences(path, fileid, tokenizer):
     ############# test ##############
     pred_spantokens = labels_to_anns(label_sequence, text_spantokens)
     ok += len(ann_spantokens)
+    ann_spantokens = [(start, end) for token, start, end in ann_spantokens]
+    pred_spantokens = [(start, end) for token, start, end in pred_spantokens]
     if ann_spantokens != pred_spantokens:
-        #print('#########################')
-        #print(text_spantokens)
-        #print('--------------------------')
-        #print(label_sequence)
-        #print('---------- true ----------------')
-        #print(ann_spantokens)
-        #print('----------- pred ---------------')
-        #print(pred_spantokens)
+        print('#########################')
+        print(text_spantokens)
+        print('--------------------------')
+        print(label_sequence)
+        print('---------- true ----------------')
+        print(ann_spantokens)
+        print('----------- pred ---------------')
+        print(pred_spantokens)
         fail += len(set(ann_spantokens) - set(pred_spantokens))
         ok -= len(set(ann_spantokens) - set(pred_spantokens))
         print("labelize fail num: {}".format(fail))
@@ -52,18 +54,22 @@ def make_tokens_and_labels(text_spantokens, ann_spantokens):
         elif start == ann_spantokens[ann_idx][1]:
             tokens.append(token)
             labels.append(B)
-        elif pre_label in [B, I] and end <= ann_spantokens[ann_idx][2]:
+        elif start > ann_spantokens[ann_idx][1] and end <= ann_spantokens[ann_idx][2]:
+            if pre_label == O:
+                labels[-1] = B
             tokens.append(token)
             labels.append(I)
-        else:
+        elif start < ann_spantokens[ann_idx][1] or end > ann_spantokens[ann_idx][2]:
             tokens.append(token)
             labels.append(O)
-            if pre_label in [B, I]:
-                ann_idx += 1
-        # ann_idxがずれた場合の対処
-        if ann_idx + 1 < len(ann_spantokens) and end > ann_spantokens[ann_idx + 1][1]:
+        else:
+            print("Labelize Error !!!")
+            exit(1)
+
+        if ann_idx < len(ann_spantokens) and end >= ann_spantokens[ann_idx][2]:
             ann_idx += 1
-            labels[-1] = B
+
+        #print(token, start, end)
         pre_label = labels[-1]
     return tokens, labels
 
@@ -74,9 +80,13 @@ def text_to_spantokens(text, tokenizer):
     ix = 0
     end_ix = 1
     for token in tokenizer(text):
-        spantokens.append((token, ix, end_ix + len(token) - 1))
-        ix += len(token)
-        end_ix += len(token)
+        if token == " ":
+            ix += 1
+            end_ix += 1
+        else:
+            spantokens.append((token, ix, end_ix + len(token) - 1))
+            ix += len(token)
+            end_ix += len(token)
     return spantokens
 
 

@@ -85,8 +85,11 @@ if __name__ == '__main__':
             loss = model.loss(token_batch, char_batch, label_batch) / token_batch.shape[0]
             loss.backward()
             optimizer.step()
-            print("loss: {}".format(float(loss)))
+            #print("loss: {}".format(float(loss)))
             loss_per_epoch += float(loss)
-
+        
         print('{}epoch\nloss: {}\nvalid: {}\ntime: {} sec.\n'.format(epoch, loss_per_epoch, 0, time.time() - start))
+        if epoch % 10 == 0:
+            print("model save {}epoch".format(epoch))
+            checkpoint(model, opt.model_path)
     checkpoint(model, opt.model_path)

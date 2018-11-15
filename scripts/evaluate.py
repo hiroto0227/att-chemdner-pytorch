@@ -89,7 +89,6 @@ if __name__ == "__main__":
     parser.add_argument("--train-path", type=str, help="train path (for token2id)")
     parser.add_argument("--model-path", type=str, help="model path")
     parser.add_argument("--config-path", type=str, help="train config path")
-    parser.add_argument("--tokenizer-path", type=str, help="tokenizer")
     opt = parser.parse_args()
 
     evaluate(opt.train_path, opt.test_path, opt.model_path, opt.config_path)

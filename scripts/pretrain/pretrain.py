@@ -1,4 +1,3 @@
-import torch
 import numpy as np
 
 
@@ -17,16 +16,16 @@ def load_word2vec(word2vec_path):
 
 
 def make_pretrain_embed(word2vec, token2id, word_embed_size):
-    embed = torch.zeros((len(token2id), word_embed_size))
+    embed = np.zeros((len(token2id), word_embed_size))
     for token, idx in token2id.items():
         try:
-            embed[idx] = torch.from_numpy(word2vec[token])
+            embed[idx] = word2vec[token]
         except KeyError:
             try:
-                embed[idx] = torch.from_numpy(word2vec[token.lower()])
+                embed[idx] = word2vec[token.lower()]
             except KeyError:
                 print("OOV: {}".format(token))
-        except RuntimeError:
+        except ValueError:
             print("=" * 50)
             print(token)
             print(word2vec[token].shape)
