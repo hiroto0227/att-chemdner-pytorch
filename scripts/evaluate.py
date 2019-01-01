@@ -66,6 +66,9 @@ def evaluate(train_path, test_path, model_path, config_path, verbose=1):
         pred_labels = [id2label[int(label_id)] for label_id in pred_label_ids.squeeze(0)]
         pred_ann_spantokens = labels_to_anns(pred_labels, text_spantokens)
 
+        true_ann_spantokens = [(start, end) for token, start, end in true_ann_spantokens]
+        pred_ann_spantokens = [(start, end) for token, start, end in pred_ann_spantokens]
+
         pred_num += len(pred_ann_spantokens)
         true_num += len(true_ann_spantokens)
         TP += len(set(pred_ann_spantokens) & set(true_ann_spantokens))

@@ -3,7 +3,7 @@ import numpy as np
 from collections import deque
 import torch
 from torch.autograd import Variable
-from labels import UNK, PAD, COMMA, NEWLINE
+from labels import UNK, PAD
 
 
 def get_variable(tensor, use_gpu=False, **kwargs):

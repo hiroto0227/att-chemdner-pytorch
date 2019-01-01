@@ -51,7 +51,7 @@ def batch_gen(token_id_seqs, char_id_seqs, label_id_seqs, batch_size, word_pad_i
             token_batches, char_batches, label_batches = [], [], []
 
 
-def padding(batches, max_len, pad_ix, char_level_pad=False, char_max_len=None):
+def padding(batches, max_len, pad_ix, char_level=False, char_max_len=None):
     pad_batches = []
     for batch in batches:
         pad_length = max_len - len(batch)
@@ -63,7 +63,10 @@ def padding(batches, max_len, pad_ix, char_level_pad=False, char_max_len=None):
             pad_batch = [[pad_ix for i in range(char_max_len)] for j in range(pad_length)]
             pad_batches.append(padded_char_batch + pad_batch)
         else:
-            pad_batches.append(batch + [pad_ix for i in range(pad_length)])
+            if char_level:
+                pad_batches.append(batch + [[pad_ix] for i in range(pad_length)])
+            else:
+                pad_batches.append(batch + [pad_ix for i in range(pad_length)])
     return pad_batches
 
 

@@ -25,7 +25,7 @@ if __name__ == '__main__':
     parser.add_argument('--char-lstm', type=int, default=50)
     parser.add_argument('--sp-model', type=str, default=None, help='sentencepiece model path')
     parser.add_argument('--dropout', type=float, default=0.5)
-    parser.add_argument('--learning-rate', type=float, default=0.001)
+    parser.add_argument('--learning-rate', type=float, default=0.00005)
     parser.add_argument('--weight-decay', type=float, default=1e-8)
     parser.add_argument('--word2vec-path', type=str, default=None, help='pretrained word2vec path')
     parser.add_argument('--model-path', type=str, default='./chemdner.pth', help='path to save model')
@@ -82,7 +82,10 @@ if __name__ == '__main__':
             token_batch = get_variable(torch.LongTensor(token_batch), use_gpu=opt.gpu).transpose(1, 0)
             char_batch = get_variable(torch.LongTensor(char_batch), use_gpu=opt.gpu).transpose(1, 0)
             label_batch = get_variable(torch.LongTensor(label_batch), use_gpu=opt.gpu).transpose(1, 0)
-            loss = model.loss(token_batch, char_batch, label_batch) / token_batch.shape[0]
+            # loss = model.loss(token_batch, char_batch, label_batch) / token_batch.shape[0]
+            loss = model.loss(token_batch, char_batch, label_batch)
+            optimizer.zero_grad()
+            print("loss: {}".format(loss))
             loss.backward()
             optimizer.step()
             #print("loss: {}".format(float(loss)))

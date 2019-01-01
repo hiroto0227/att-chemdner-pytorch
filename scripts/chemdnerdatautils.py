@@ -6,7 +6,6 @@ from labels import O, B, I
 ok = 0
 fail = 0
 
-
 def file2sequences(path, fileid, tokenizer):
     global fail, ok
     with open(os.path.join(path, fileid + '.txt'), 'rt') as f:
@@ -74,21 +73,21 @@ def make_tokens_and_labels(text_spantokens, ann_spantokens):
     return tokens, labels
 
 
+
 def text_to_spantokens(text, tokenizer):
     """textをtokenizeし、(token, start_ix, end_ix)のリストとして返す。"""
     spantokens = []
     ix = 0
     end_ix = 1
     for token in tokenizer(text):
-        if token == " ":
-            ix += 1
-            end_ix += 1
-        else:
-            spantokens.append((token, ix, end_ix + len(token) - 1))
-            ix += len(token)
-            end_ix += len(token)
+        #if token == " ":
+        #    ix += 1
+        #    end_ix += 1
+        #else:
+        spantokens.append((token, ix, end_ix + len(token) - 1))
+        ix += len(token)
+        end_ix += len(token)
     return spantokens
-
 
 def annotations_to_spantokens(annotations):
     spantokens = []
@@ -169,6 +168,10 @@ def tokenize(text):
     """textをtoken単位に分割したリストを返す。"""
     tokens = re.split("( | |\xa0|\t|\n|…|\'|\"|·|~|↔|•|\!|@|#|\$|%|\^|&|\*|-|=|_|\+|ˉ|\(|\)|\[|\]|\{|\}|;|‘|:|“|,|\.|\/|<|>|×|>|<|≤|≥|↑|↓|→|¬|®|•|′|°|~|≈|\?|Δ|÷|≠|‘|’|“|”|§|£|€|0|1|2|3|4|5|6|7|8|9|™|⋅|-|\u2000|⁺|\u2009)", text)
     return list(filter(None, tokens))
+
+def char_tokenize(text):
+    tokens = re.split("", text)
+    return list(text)
 
 def file2char_level_sequences(path, fileid):
     def annotation2entities(annotation):
